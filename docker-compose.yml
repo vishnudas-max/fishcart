@@ -1,0 +1,69 @@
+services:
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+        format: raw
+      - path: ./.env
+        required: false
+        format: raw
+    environment:
+      DB_ENGINE: postgres
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-fish_ecommerce}
+      POSTGRES_USER: ${POSTGRES_USER:-fish_ecommerce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password-change-before-deploy}
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check", "--database", "default"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    environment:
+      BACKEND_URL: http://backend:8000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+  db:
+    image: postgres:14.24-trixie
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fish_ecommerce}
+      POSTGRES_USER: ${POSTGRES_USER:-fish_ecommerce}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password-change-before-deploy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  media_data:

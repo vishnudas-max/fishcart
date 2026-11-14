@@ -1,0 +1,124 @@
+{
+  "info": {
+    "_postman_id": "c981b0bd-68b1-4e8e-aeeb-98c04c9a9825",
+    "name": "Seafood Commerce API",
+    "description": "Customer, catalog, cart, order, and custom staff API. Import this collection into Postman and set baseUrl (default http://localhost:8000). Customer access JWT is captured after OTP verification. Refresh/session cookies are maintained by Postman's cookie jar.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "accessToken", "value": "" },
+    { "key": "phoneNumber", "value": "+14155552671" },
+    { "key": "otpCode", "value": "" },
+    { "key": "username", "value": "seafood_customer" },
+    { "key": "addressId", "value": "1" },
+    { "key": "addressId2", "value": "2" },
+    { "key": "categoryId", "value": "1" },
+    { "key": "subcategoryId", "value": "2" },
+    { "key": "productId", "value": "1" },
+    { "key": "productSlug", "value": "sample-fish" },
+    { "key": "processingOptionId", "value": "1" },
+    { "key": "cartItemId", "value": "1" },
+    { "key": "orderId", "value": "1" },
+    { "key": "staffUsername", "value": "" },
+    { "key": "staffPassword", "value": "" },
+    { "key": "staffUserId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Customer authentication and profile",
+      "item": [
+        { "name": "Initialize customer CSRF cookie", "event": [{ "listen": "test", "script": { "exec": ["const token = pm.cookies.get('csrftoken');", "if (token) pm.collectionVariables.set('csrfToken', token);"] } }], "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/csrf/" } },
+        { "name": "Request OTP", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"phone_number\": \"{{phoneNumber}}\"\n}" }, "url": "{{baseUrl}}/api/auth/otp/request/" } },
+        { "name": "Verify OTP (captures access token)", "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code >= 200 && pm.response.code < 300) {", "  const data = pm.response.json();", "  if (data.access) pm.collectionVariables.set('accessToken', data.access);", "}"] } }], "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"phone_number\": \"{{phoneNumber}}\",\n  \"code\": \"{{otpCode}}\",\n  \"username\": \"{{username}}\"\n}" }, "url": "{{baseUrl}}/api/auth/otp/verify/" } },
+        { "name": "Refresh access token (refresh cookie + CSRF)", "event": [{ "listen": "test", "script": { "exec": ["if (pm.response.code >= 200 && pm.response.code < 300) {", "  const data = pm.response.json();", "  if (data.access) pm.collectionVariables.set('accessToken', data.access);", "}"] } }], "request": { "method": "POST", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/auth/refresh/" } },
+        { "name": "Current user (GET)", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/auth/me/" } },
+        { "name": "Update username/profile (PATCH)", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"first_name\": \"Asha\",\n  \"last_name\": \"Customer\"\n}" }, "url": "{{baseUrl}}/api/auth/me/" } },
+        { "name": "Update profile photo (multipart)", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "body": { "mode": "formdata", "formdata": [{ "key": "profile_photo", "type": "file", "src": "" }] }, "url": "{{baseUrl}}/api/auth/me/" } },
+        { "name": "Logout customer", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/auth/logout/" } }
+      ]
+    },
+    {
+      "name": "Customer addresses",
+      "item": [
+        { "name": "List my addresses", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/auth/addresses/" } },
+        { "name": "Create address", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"label\": \"Home\",\n  \"recipient_name\": \"Asha Customer\",\n  \"phone_number\": \"{{phoneNumber}}\",\n  \"address_line1\": \"12 Example Road\",\n  \"address_line2\": \"Apartment 4\",\n  \"landmark\": \"Near market\",\n  \"city\": \"Chennai\",\n  \"state\": \"Tamil Nadu\",\n  \"postal_code\": \"600001\",\n  \"country_code\": \"IN\",\n  \"latitude\": 13.0827,\n  \"longitude\": 80.2707,\n  \"is_default\": true\n}" }, "url": "{{baseUrl}}/api/auth/addresses/" } },
+        { "name": "Retrieve address", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/" } },
+        { "name": "Update address", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"label\": \"Work\",\n  \"address_line1\": \"99 New Street\",\n  \"city\": \"Chennai\",\n  \"latitude\": 13.05,\n  \"longitude\": 80.25\n}" }, "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/" } },
+        { "name": "Set default address", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/set-default/" } },
+        { "name": "Delete address", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/" } }
+      ]
+    },
+    {
+      "name": "Public catalog",
+      "item": [
+        { "name": "List categories and subcategories", "request": { "method": "GET", "url": "{{baseUrl}}/api/catalog/categories/" } },
+        { "name": "List products (pagination and filters)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/catalog/products/?page=1&page_size=20&category=fish&subcategory=sea-fish&fish_type=sea&min_price=100&max_price=1500&search=salmon&ordering=price_per_unit", "host": ["{{baseUrl}}"], "path": ["api", "catalog", "products"], "query": [{ "key": "page", "value": "1" }, { "key": "page_size", "value": "20" }, { "key": "category", "value": "fish" }, { "key": "subcategory", "value": "sea-fish" }, { "key": "fish_type", "value": "sea" }, { "key": "min_price", "value": "100" }, { "key": "max_price", "value": "1500" }, { "key": "search", "value": "salmon" }, { "key": "ordering", "value": "price_per_unit" }] } } },
+        { "name": "Product detail by slug", "request": { "method": "GET", "url": "{{baseUrl}}/api/catalog/products/{{productSlug}}/" } }
+      ]
+    },
+    {
+      "name": "Customer cart",
+      "item": [
+        { "name": "Get cart and calculated totals", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/cart/" } },
+        { "name": "Add cart item", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": \"1.000\",\n  \"processing_option_ids\": [{{processingOptionId}}],\n  \"preorder_eligible\": false\n}" }, "url": "{{baseUrl}}/api/cart/items/" } },
+        { "name": "Update cart item", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"quantity\": \"2.000\",\n  \"processing_option_ids\": [{{processingOptionId}}]\n}" }, "url": "{{baseUrl}}/api/cart/items/{{cartItemId}}/" } },
+        { "name": "Remove cart item", "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/cart/items/{{cartItemId}}/" } }
+      ]
+    },
+    {
+      "name": "Customer orders",
+      "item": [
+        { "name": "Checkout ASAP order", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"address_id\": {{addressId}},\n  \"fulfillment_type\": \"asap\",\n  \"customer_note\": \"Please call on arrival\"\n}" }, "url": "{{baseUrl}}/api/orders/" } },
+        { "name": "Create future preorder", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"address_id\": {{addressId}},\n  \"fulfillment_type\": \"preorder\",\n  \"scheduled_for\": \"2026-12-01T18:30:00+05:30\",\n  \"customer_note\": \"Preorder for dinner\"\n}" }, "url": "{{baseUrl}}/api/orders/" } },
+        { "name": "List my orders", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/orders/" } },
+        { "name": "Order detail", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/orders/{{orderId}}/" } }
+      ]
+    },
+    {
+      "name": "Staff dashboard (session authentication)",
+      "item": [
+        { "name": "Initialize staff CSRF cookie", "event": [{ "listen": "test", "script": { "exec": ["const token = pm.cookies.get('csrftoken');", "if (token) pm.collectionVariables.set('csrfToken', token);"] } }], "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/csrf/" } },
+        { "name": "Staff login", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{staffUsername}}\",\n  \"password\": \"{{staffPassword}}\"\n}" }, "url": "{{baseUrl}}/api/staff/login/" } },
+        { "name": "Staff identity", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/me/" } },
+        { "name": "Dashboard stats", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/dashboard/" } },
+        { "name": "Staff logout", "request": { "method": "POST", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/staff/logout/" } }
+      ]
+    },
+    {
+      "name": "Staff catalog management",
+      "item": [
+        { "name": "List/search categories", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/categories/?page=1&page_size=25&search=fish" } },
+        { "name": "Create top-level category", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Fish\",\n  \"slug\": \"fish\",\n  \"kind\": \"fish\",\n  \"description\": \"Fresh seafood\",\n  \"is_active\": true,\n  \"sort_order\": 0\n}" }, "url": "{{baseUrl}}/api/staff/categories/" } },
+        { "name": "Create subcategory", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Sea Fish\",\n  \"slug\": \"sea-fish\",\n  \"kind\": \"fish\",\n  \"parent\": {{categoryId}},\n  \"is_active\": true\n}" }, "url": "{{baseUrl}}/api/staff/categories/" } },
+        { "name": "Retrieve category", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/" } },
+        { "name": "Update category", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated category description\",\n  \"sort_order\": 1\n}" }, "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/" } },
+        { "name": "Archive category (DELETE is soft archive)", "request": { "method": "DELETE", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/" } },
+        { "name": "List/search products", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/products/?page=1&page_size=25&search=salmon&category={{subcategoryId}}&is_active=true" } },
+        { "name": "Create product (multipart; select image file)", "request": { "method": "POST", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "formdata", "formdata": [{ "key": "name", "value": "Sample Sea Fish", "type": "text" }, { "key": "slug", "value": "sample-sea-fish", "type": "text" }, { "key": "description", "value": "Fresh catch", "type": "text" }, { "key": "category", "value": "{{subcategoryId}}", "type": "text" }, { "key": "price_per_unit", "value": "499.00", "type": "text" }, { "key": "unit", "value": "kg", "type": "text" }, { "key": "fish_type", "value": "sea", "type": "text" }, { "key": "available_quantity", "value": "20.000", "type": "text" }, { "key": "minimum_quantity", "value": "0.500", "type": "text" }, { "key": "quantity_step", "value": "0.500", "type": "text" }, { "key": "is_active", "value": "true", "type": "text" }, { "key": "is_featured", "value": "false", "type": "text" }, { "key": "image", "type": "file", "src": "" }] }, "url": "{{baseUrl}}/api/staff/products/" } },
+        { "name": "Upload product image (multipart)", "request": { "method": "PATCH", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "formdata", "formdata": [{ "key": "image", "type": "file", "src": "" }] }, "url": "{{baseUrl}}/api/staff/products/{{productId}}/" } },
+        { "name": "Retrieve product", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/products/{{productId}}/" } },
+        { "name": "Update product", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"price_per_unit\": \"549.00\",\n  \"available_quantity\": \"15.000\",\n  \"is_featured\": true\n}" }, "url": "{{baseUrl}}/api/staff/products/{{productId}}/" } },
+        { "name": "Archive product (DELETE is soft archive)", "request": { "method": "DELETE", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/staff/products/{{productId}}/" } },
+        { "name": "List processing options", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/processing-options/?category={{categoryId}}&search=clean" } },
+        { "name": "Create fish processing option", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Clean and cut\",\n  \"slug\": \"clean-and-cut\",\n  \"category\": {{categoryId}},\n  \"price_per_kg\": \"50.00\",\n  \"is_active\": true,\n  \"sort_order\": 0\n}" }, "url": "{{baseUrl}}/api/staff/processing-options/" } },
+        { "name": "Retrieve processing option", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/" } },
+        { "name": "Update processing option", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"price_per_kg\": \"60.00\",\n  \"is_active\": true\n}" }, "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/" } },
+        { "name": "Archive processing option", "request": { "method": "DELETE", "header": [{ "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/" } }
+      ]
+    },
+    {
+      "name": "Staff users, addresses, orders",
+      "item": [
+        { "name": "List/search customers", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/users/?page=1&page_size=25&search=asha" } },
+        { "name": "Customer detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/users/{{staffUserId}}/" } },
+        { "name": "Activate/deactivate customer or staff", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"is_active\": false\n}" }, "url": "{{baseUrl}}/api/staff/users/{{staffUserId}}/status/" } },
+        { "name": "List/search customer addresses", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/addresses/?page=1&page_size=25&search=Chennai" } },
+        { "name": "List orders (including filter examples)", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/orders/?page=1&page_size=25&preorder=true&status=pending&search=fish" } },
+        { "name": "Order detail", "request": { "method": "GET", "url": "{{baseUrl}}/api/staff/orders/{{orderId}}/" } },
+        { "name": "Manage order status or staff note", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRFToken", "value": "{{csrfToken}}" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"confirmed\",\n  \"staff_note\": \"Supply confirmed\"\n}" }, "url": "{{baseUrl}}/api/staff/orders/{{orderId}}/manage/" } }
+      ]
+    }
+  ]
+}
