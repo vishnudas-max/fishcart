@@ -110,13 +110,21 @@ The custom user model requires a unique phone number in E.164 format, including 
 - Cart configuration for quantity/weight and fish cleaning or cutting options.
 - Address book with one default address and optional latitude/longitude selected from the map.
 - Checkout for ASAP orders and future preorders. Preorders require a future date/time and are handled separately from immediate stock reservation.
+- Orders are confirmed on placement. Staff can cancel an order with a predefined customer-facing reason, and cancellations restore stock reserved by ASAP orders.
+- Delivery checkout is limited to the configured market pin and radius (50 km by default). Staff update the pin/radius from **Admin → Delivery area**; the API rechecks the saved map coordinates at checkout.
 - Customer account pages for profile details, saved addresses, and order history.
 - Staff dashboard for users, products and images, category management, fish preparation options, and order management.
 - Configurable GST percentage by product category and fish preparation option. Orders snapshot applied rates and tax amounts; historical order totals are retained.
 
 GST depends on the product/service classification and the seller's circumstances. Qualifying fresh or chilled fish under HSN heading 0302 is listed at nil GST in the [CBIC GST rate table](https://cbic-gst.gov.in/hindi/gst-goods-services-rates.html). Pickles and preparation services may have different classifications. Rates default to 0% and can be changed in the staff dashboard; confirm each rate with a qualified tax adviser before charging it.
 
-The delivery map currently uses OpenStreetMap tiles and displays attribution. The tile URL can be changed with `NEXT_PUBLIC_MAP_TILE_URL`. The public tile service is best-effort; use a contracted tile provider for production traffic that requires an availability commitment.
+Address forms request the browser's current location when opened (if the customer grants permission), and users can adjust the pin. Map integration is behind `frontend/app/components/map-picker.tsx`; replace its provider implementation to move to another map/geocoding service. The current provider uses OpenStreetMap tiles and displays attribution. Its tile URL can be changed with `NEXT_PUBLIC_MAP_TILE_URL`. The public tile service is best-effort; use a contracted tile provider for production traffic that requires an availability commitment.
+
+### Order notifications
+
+Order alerts support a provider switch with separate Telegram and WhatsApp adapters. Telegram is selected by default in `.env.example`; set `ORDER_NOTIFICATION_PROVIDER=telegram`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_ADMIN_CHAT_ID` in the private `.env`. Create a bot with Telegram's [@BotFather instructions](https://core.telegram.org/bots#how-do-i-create-a-bot), open it and send `/start`, then obtain the private chat ID from the bot's updates. For a group chat, add the bot and use that group's chat ID. Keep the bot token secret. Telegram alerts include order/customer details, items and processing options, amount breakdown, fulfillment schedule, delivery address, coordinates, and a Google Maps URL when coordinates are present.
+
+For WhatsApp, set `ORDER_NOTIFICATION_PROVIDER=whatsapp` and configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ADMIN_PHONE`, `WHATSAPP_ORDER_TEMPLATE`, and `WHATSAPP_TEMPLATE_LANGUAGE` in `.env`. This adapter requires a Meta Cloud API account and an approved template with seven body placeholders in order: order ID, customer username, customer phone, delivery address, map link, items, and total. `WHATSAPP_GRAPH_API_VERSION` is configurable. Choose `ORDER_NOTIFICATION_PROVIDER=disabled` to turn order alerts off. Never commit provider credentials. Notifications are attempted after an order transaction commits; provider failures do not roll back the order.
 
 ## API and API collection
 
@@ -133,6 +141,8 @@ Common endpoints:
 | `GET` | `/api/catalog/products/` | Browse/filter paginated products |
 | `GET`, `POST` | `/api/cart/`, `/api/cart/items/` | Read the cart or add an item |
 | `GET`, `POST` | `/api/orders/` | List customer orders or place an order |
+| `GET` | `/api/orders/delivery-area/` | Read configured market pin and delivery radius |
+| `GET`, `PATCH` | `/api/staff/delivery-area/` | Read or update market pin and delivery radius (staff session + CSRF) |
 
 ## Development notes
 

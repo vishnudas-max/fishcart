@@ -7,8 +7,9 @@ import CategoriesPage from "./sections/categories";
 import OrdersPage from "./sections/orders";
 import ProcessingPage from "./sections/processing";
 import DirectoryPage from "./sections/directory";
+import DeliveryAreaPage from "./sections/delivery-area";
 
-type Section = "overview" | "orders" | "products" | "categories" | "processing" | "customers" | "addresses";
+type Section = "overview" | "orders" | "products" | "categories" | "processing" | "customers" | "addresses" | "delivery-area";
 type Staff = { id: number; username: string; is_superuser: boolean };
 type Stats = { active_products: number; active_categories: number; customers: number; open_orders: number; pending_preorders: number; active_carts: number };
 
@@ -20,6 +21,7 @@ const navigation: { id: Section; label: string; icon: string; group: string }[] 
   { id: "processing", label: "Fish processing", icon: "⌁", group: "CATALOG" },
   { id: "customers", label: "Customers", icon: "♙", group: "PEOPLE" },
   { id: "addresses", label: "Addresses", icon: "⌖", group: "PEOPLE" },
+  { id: "delivery-area", label: "Delivery area", icon: "◎", group: "WORKSPACE" },
 ];
 
 export default function AdminDashboard() {
@@ -100,6 +102,7 @@ export default function AdminDashboard() {
           {section === "orders" && <OrdersPage onError={setError} />}
           {section === "customers" && <DirectoryPage kind="customers" onError={setError} />}
           {section === "addresses" && <DirectoryPage kind="addresses" onError={setError} />}
+          {section === "delivery-area" && <DeliveryAreaPage onError={setError} />}
         </div>
       </main>
     </div>
@@ -109,7 +112,7 @@ export default function AdminDashboard() {
 function Overview({ stats, onOpen }: { stats: Stats | null; onOpen: (section: Section) => void }) {
   const cards = [
     { label: "Open orders", value: stats?.open_orders ?? "—", hint: "Need attention", icon: "▤", accent: "blue", target: "orders" as Section },
-    { label: "Pending preorders", value: stats?.pending_preorders ?? "—", hint: "Scheduled for later", icon: "◷", accent: "amber", target: "orders" as Section },
+    { label: "Active preorders", value: stats?.pending_preorders ?? "—", hint: "Scheduled orders to prepare", icon: "◷", accent: "amber", target: "orders" as Section },
     { label: "Active products", value: stats?.active_products ?? "—", hint: "Visible in catalog", icon: "◈", accent: "green", target: "products" as Section },
     { label: "Customers", value: stats?.customers ?? "—", hint: "Registered accounts", icon: "♙", accent: "violet", target: "customers" as Section },
   ];

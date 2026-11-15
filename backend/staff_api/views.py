@@ -15,7 +15,7 @@ from rest_framework.authentication import SessionAuthentication
 
 from carts.models import Cart
 from catalog.models import Category, ProcessingOption, Product
-from orders.models import Order
+from orders.models import DeliveryServiceArea, Order
 from orders.serializers import AdminOrderUpdateSerializer, OrderSerializer
 from orders.services import transition_order_status
 from users.models import Address
@@ -23,6 +23,7 @@ from users.models import Address
 from .permissions import IsActiveStaff
 from .serializers import (
     StaffCategorySerializer,
+    StaffDeliveryServiceAreaSerializer,
     StaffAddressSerializer,
     StaffLoginSerializer,
     StaffProcessingOptionSerializer,
@@ -228,12 +229,31 @@ class StaffOrderViewSet(viewsets.ReadOnlyModelViewSet):
         serializer.is_valid(raise_exception=True)
         changes = serializer.validated_data
         if "status" in changes:
-            order = transition_order_status(order_id=order.pk, status=changes["status"])
+            order = transition_order_status(order_id=order.pk, status=changes["status"], cancellation_reason=changes.get("cancellation_reason", ""))
         if "staff_note" in changes:
             order.staff_note = changes["staff_note"]
             order.save(update_fields=["staff_note", "updated_at"])
         order = self.get_queryset().get(pk=order.pk)
         return Response(OrderSerializer(order, context={"request": request}).data)
+
+
+class StaffDeliveryServiceAreaView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsActiveStaff]
+
+    def get_object(self):
+        area, _ = DeliveryServiceArea.objects.get_or_create(pk=1)
+        return area
+
+    def get(self, request):
+        return Response(StaffDeliveryServiceAreaSerializer(self.get_object()).data)
+
+    def patch(self, request):
+        area = self.get_object()
+        serializer = StaffDeliveryServiceAreaSerializer(area, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class StaffDashboardStatsView(APIView):
@@ -246,6 +266,6 @@ class StaffDashboardStatsView(APIView):
             "active_categories": Category.objects.filter(is_active=True).count(),
             "customers": User.objects.filter(is_staff=False).count(),
             "open_orders": Order.objects.exclude(status__in=[Order.Status.COMPLETED, Order.Status.CANCELLED]).count(),
-            "pending_preorders": Order.objects.filter(fulfillment_type=Order.FulfillmentType.PREORDER, status=Order.Status.PENDING).count(),
+            "pending_preorders": Order.objects.filter(fulfillment_type=Order.FulfillmentType.PREORDER).exclude(status__in=[Order.Status.COMPLETED, Order.Status.CANCELLED]).count(),
             "active_carts": Cart.objects.filter(items__isnull=False).distinct().count(),
         })

@@ -1,5 +1,7 @@
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
+import math
+import logging
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -9,9 +11,37 @@ from rest_framework.exceptions import ValidationError
 from catalog.models import Product
 from carts.models import Cart, CartItem
 
-from .models import Order, OrderItem, OrderItemOption
+from .models import DeliveryServiceArea, Order, OrderItem, OrderItemOption
 
 MONEY = Decimal("0.01")
+logger = logging.getLogger(__name__)
+
+CANCELLATION_MESSAGES = {
+    Order.CancellationReason.OUT_OF_STOCK: "An item in your order is no longer available. We’ve cancelled the order and will contact you about the next steps.",
+    Order.CancellationReason.DELIVERY_UNAVAILABLE: "We’re unable to deliver to your location at the selected time. We’ve cancelled the order; please contact us if you need help.",
+    Order.CancellationReason.OPERATIONAL_ISSUE: "We’re unable to complete your order due to an unexpected operational issue. We’re sorry for the inconvenience.",
+    Order.CancellationReason.CUSTOMER_REQUEST: "Your order was cancelled as requested.",
+}
+
+
+def haversine_km(latitude_a, longitude_a, latitude_b, longitude_b):
+    lat1, lat2 = math.radians(float(latitude_a)), math.radians(float(latitude_b))
+    d_lat = lat2 - lat1
+    d_lon = math.radians(float(longitude_b) - float(longitude_a))
+    value = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
+    return 6371.0088 * 2 * math.asin(math.sqrt(min(1, value)))
+
+
+def validate_delivery_location(address):
+    area = DeliveryServiceArea.objects.filter(pk=1).first()
+    if not area or area.latitude is None or area.longitude is None:
+        raise ValidationError({"delivery": "Delivery location has not been configured yet. Please try again later."})
+    if address.latitude is None or address.longitude is None:
+        raise ValidationError({"address": "Pin this address on the map to check delivery availability."})
+    distance = haversine_km(area.latitude, area.longitude, address.latitude, address.longitude)
+    if distance > float(area.radius_km):
+        raise ValidationError({"delivery": f"This address is outside our {area.radius_km} km delivery area."})
+    return distance
 
 
 def _tax_amount(amount, rate):
@@ -48,6 +78,7 @@ def _address_snapshot(address):
 
 @transaction.atomic
 def create_order(*, user, address, fulfillment_type, scheduled_for=None, customer_note=""):
+    validate_delivery_location(address)
     cart = Cart.objects.select_for_update().filter(user=user).first()
     if cart is None:
         raise ValidationError({"cart": "Your cart is empty."})
@@ -82,7 +113,7 @@ def create_order(*, user, address, fulfillment_type, scheduled_for=None, custome
         address_snapshot=_address_snapshot(address),
         fulfillment_type=fulfillment_type,
         scheduled_for=scheduled_for,
-        status=Order.Status.PENDING,
+        status=Order.Status.CONFIRMED,
         customer_note=customer_note,
         stock_reserved=not is_preorder,
     )
@@ -135,14 +166,29 @@ def create_order(*, user, address, fulfillment_type, scheduled_for=None, custome
             product.available_quantity -= quantity
             product.save(update_fields=["available_quantity", "updated_at"])
     CartItem.objects.filter(cart=cart).delete()
+    transaction.on_commit(lambda order_id=order.pk: _notify_admin_safely(order_id))
     return order
 
 
+def _notify_admin_safely(order_id):
+    try:
+        from .notifications import send_admin_order_notification
+        send_admin_order_notification(order_id)
+    except Exception:
+        # Notification failures must not turn a committed order into a failed checkout response.
+        logger.exception("Admin order notification failed for order_id=%s", order_id)
+
+
 @transaction.atomic
-def transition_order_status(*, order_id, status):
+def transition_order_status(*, order_id, status, cancellation_reason=""):
     order = Order.objects.select_for_update().get(pk=order_id)
     if status not in TRANSITIONS.get(order.status, set()):
         raise ValidationError({"status": f"Cannot move an order from {order.status} to {status}."})
+    if status == Order.Status.CANCELLED:
+        if cancellation_reason not in CANCELLATION_MESSAGES:
+            raise ValidationError({"cancellation_reason": "Choose a predefined cancellation reason."})
+        order.cancellation_reason = cancellation_reason
+        order.cancellation_message = CANCELLATION_MESSAGES[cancellation_reason]
     if status == Order.Status.CANCELLED and order.stock_reserved:
         items = list(order.items.select_for_update().filter(product__isnull=False).order_by("product_id"))
         quantities = defaultdict(lambda: Decimal("0"))
@@ -154,5 +200,5 @@ def transition_order_status(*, order_id, status):
             product.save(update_fields=["available_quantity", "updated_at"])
         order.stock_reserved = False
     order.status = status
-    order.save(update_fields=["status", "stock_reserved", "updated_at"])
+    order.save(update_fields=["status", "stock_reserved", "cancellation_reason", "cancellation_message", "updated_at"])
     return order

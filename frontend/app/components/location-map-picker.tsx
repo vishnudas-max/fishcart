@@ -17,7 +17,7 @@ const fromWorld = (x: number, y: number, zoom: number): Coordinates => {
   return { longitude: ((x / size) * 360 - 180 + 540) % 360 - 180, latitude: Math.atan(Math.sinh(Math.PI * (1 - 2 * y / size))) * 180 / Math.PI };
 };
 
-export function LocationMapPicker({ value, onChange }: { value: Coordinates | null; onChange: (value: Coordinates) => void }) {
+export function OpenStreetMapMapProvider({ value, onChange }: { value: Coordinates | null; onChange: (value: Coordinates) => void }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number; centerX: number; centerY: number; moved: boolean } | null>(null);

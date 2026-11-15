@@ -6,6 +6,7 @@ from .views import (
     StaffCSRFView,
     StaffCategoryViewSet,
     StaffDashboardStatsView,
+    StaffDeliveryServiceAreaView,
     StaffLoginView,
     StaffLogoutView,
     StaffMeView,
@@ -29,5 +30,6 @@ urlpatterns = [
     path("logout/", StaffLogoutView.as_view(), name="staff-logout"),
     path("me/", StaffMeView.as_view(), name="staff-me"),
     path("dashboard/", StaffDashboardStatsView.as_view(), name="staff-dashboard"),
+    path("delivery-area/", StaffDeliveryServiceAreaView.as_view(), name="staff-delivery-area"),
     path("", include(router.urls)),
 ]

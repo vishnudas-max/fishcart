@@ -3,9 +3,20 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from catalog.models import Category, ProcessingOption, Product
+from orders.models import DeliveryServiceArea
 from users.models import Address
 
 User = get_user_model()
+
+
+class StaffDeliveryServiceAreaSerializer(serializers.ModelSerializer):
+    configured = serializers.SerializerMethodField()
+    class Meta:
+        model = DeliveryServiceArea
+        fields = ("latitude", "longitude", "radius_km", "configured", "updated_at")
+        read_only_fields = ("configured", "updated_at")
+    def get_configured(self, obj):
+        return obj.latitude is not None and obj.longitude is not None
 
 
 class StaffLoginSerializer(serializers.Serializer):

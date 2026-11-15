@@ -1,13 +1,13 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from users.models import Address
 
-from .models import Order
-from .serializers import OrderCreateSerializer, OrderSerializer
+from .models import DeliveryServiceArea, Order
+from .serializers import DeliveryServiceAreaSerializer, OrderCreateSerializer, OrderSerializer
 from .services import create_order
 
 
@@ -32,3 +32,13 @@ class CustomerOrderDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related("items__options").select_related("address")
+
+
+class CustomerDeliveryAreaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        area = DeliveryServiceArea.objects.filter(pk=1).first()
+        if area is None:
+            return Response({"latitude": None, "longitude": None, "radius_km": "50.00", "configured": False})
+        return Response(DeliveryServiceAreaSerializer(area).data)
