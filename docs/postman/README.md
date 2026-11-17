@@ -31,7 +31,7 @@ Import [`Seafood Commerce API.postman_collection.json`](Seafood%20Commerce%20API
 | --- | --- |
 | Customer auth/profile | `GET csrf`, `POST otp/request`, `POST otp/verify`, `POST refresh`, `GET/PATCH me`, profile photo upload, `POST logout` |
 | Customer addresses | `GET/POST addresses`, `GET/PATCH/DELETE addresses/{id}`, `POST addresses/{id}/set-default` |
-| Catalog | `GET categories`, `GET products` with paging/filter examples, `GET products/{slug}` |
+| Catalog | `GET categories`, `GET products` with paging/filter examples, `GET products/{slug}`, product review list/create/update/delete |
 | Cart | `GET cart`, `POST items`, `PATCH/DELETE items/{id}` |
 | Orders | `GET delivery-area`, `GET/POST orders`, `GET orders/{id}` |
 | Staff session/config | `GET csrf`, `POST login/logout`, `GET me/dashboard`, `GET/PATCH delivery-area` |
@@ -40,6 +40,8 @@ Import [`Seafood Commerce API.postman_collection.json`](Seafood%20Commerce%20API
 | Staff orders | paginated/search/filter list, detail and status/note/cancellation updates |
 
 Product filters use `category`, `subcategory`, `fish_type`, `min_price`, `max_price`, `search`, `ordering`, `page`, and `page_size`. Staff order filters include `preorder`, `status`, `search`, `page`, and `page_size`.
+
+Reviews are public to read, but customers can create one only after an order containing that product is completed. Each customer can leave one review per product and may update or delete their own review. Staff can hide a review in Django admin; hidden reviews are excluded from product ratings and the public list. Reviews use a generic “Verified customer” display name to avoid publishing customer identifiers.
 
 ## Notes
 

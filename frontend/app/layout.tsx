@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Chanda Fresh | Pier-to-door seafood",
+  title: "തട്ട് | Fresh fish from Munambam",
   description: "Fresh seafood sourced daily from Kochi harbors, cleaned and cut to order.",
 };
 

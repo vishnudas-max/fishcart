@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, ProcessingOption, Product
+from .models import Category, ProcessingOption, Product, ProductReview
 
 
 @admin.register(Category)
@@ -26,3 +26,11 @@ class ProcessingOptionAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "category")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
+
+
+@admin.register(ProductReview)
+class ProductReviewAdmin(admin.ModelAdmin):
+    list_display = ("product", "user", "rating", "is_visible", "created_at")
+    list_filter = ("is_visible", "rating", "created_at")
+    search_fields = ("product__name", "user__username", "user__phone_number", "comment")
+    readonly_fields = ("product", "user", "rating", "comment", "created_at", "updated_at")

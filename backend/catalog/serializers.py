@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from .models import Category, ProcessingOption, Product
+from .models import Category, ProcessingOption, Product, ProductReview
 
 
 class ProcessingOptionSerializer(serializers.ModelSerializer):
@@ -27,10 +27,12 @@ class ProductSerializer(serializers.ModelSerializer):
     processing_options = serializers.SerializerMethodField()
     is_fish = serializers.BooleanField(read_only=True)
     gst_rate = serializers.DecimalField(max_digits=5, decimal_places=2, source="category.gst_rate", read_only=True)
+    review_count = serializers.IntegerField(read_only=True)
+    average_rating = serializers.DecimalField(max_digits=3, decimal_places=2, read_only=True, allow_null=True)
 
     class Meta:
         model = Product
-        fields = ("id", "name", "slug", "description", "image", "category", "price_per_unit", "unit", "fish_type", "available_quantity", "minimum_quantity", "quantity_step", "is_fish", "gst_rate", "processing_options")
+        fields = ("id", "name", "slug", "description", "image", "category", "price_per_unit", "unit", "fish_type", "available_quantity", "minimum_quantity", "quantity_step", "is_fish", "gst_rate", "processing_options", "review_count", "average_rating")
 
     def get_processing_options(self, obj):
         if not obj.is_fish:
@@ -52,3 +54,30 @@ class ProductQuerySerializer(serializers.Serializer):
         if attrs.get("min_price") is not None and attrs.get("max_price") is not None and attrs["min_price"] > attrs["max_price"]:
             raise serializers.ValidationError({"max_price": "Must be greater than or equal to min_price."})
         return attrs
+
+
+class ProductReviewSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    is_verified_purchase = serializers.BooleanField(read_only=True, default=True)
+    is_mine = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductReview
+        fields = ("id", "rating", "comment", "display_name", "is_verified_purchase", "is_mine", "created_at", "updated_at")
+        read_only_fields = ("id", "display_name", "is_verified_purchase", "is_mine", "created_at", "updated_at")
+
+    def get_display_name(self, obj):
+        # Avoid exposing usernames or phone numbers on public product pages.
+        return "Verified customer"
+
+    def get_is_mine(self, obj):
+        request = self.context.get("request")
+        return bool(request and request.user.is_authenticated and obj.user_id == request.user.pk)
+
+    def validate_rating(self, value):
+        if not 1 <= value <= 5:
+            raise serializers.ValidationError("Rating must be from 1 to 5.")
+        return value
+
+    def validate_comment(self, value):
+        return value.strip()

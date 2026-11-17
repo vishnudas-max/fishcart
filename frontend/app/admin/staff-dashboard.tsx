@@ -8,6 +8,7 @@ import OrdersPage from "./sections/orders";
 import ProcessingPage from "./sections/processing";
 import DirectoryPage from "./sections/directory";
 import DeliveryAreaPage from "./sections/delivery-area";
+import { ThattBrand } from "../components/thatt-brand";
 
 type Section = "overview" | "orders" | "products" | "categories" | "processing" | "customers" | "addresses" | "delivery-area";
 type Staff = { id: number; username: string; is_superuser: boolean };
@@ -58,12 +59,12 @@ export default function AdminDashboard() {
     setStaff(null);
   }
 
-  if (checking) return <main className="boot-screen"><span className="brand-mark">S</span><span>Opening SeaCart staff…</span></main>;
+  if (checking) return <main className="boot-screen"><ThattBrand className="admin-boot-logo" /><span>Opening തട്ട് staff…</span></main>;
 
   if (!staff) return (
     <main className="login-shell">
       <div className="login-art">
-        <div className="login-brand"><span className="brand-mark">S</span><span>SeaCart<span className="brand-soft"> / operations</span></span></div>
+        <div className="login-brand"><ThattBrand className="admin-login-logo" /><span>തട്ട്<span className="brand-soft"> / operations</span></span></div>
         <div className="login-art-copy"><span className="eyebrow">FRESH FROM THE COAST</span><h1>Good seafood.<br />Thoughtful service.</h1><p>Your daily operations, in one calm place.</p></div>
         <div className="wave-art" aria-hidden="true"><span>〰</span><span>〰</span><span>〰</span></div>
         <small>STAFF WORKSPACE · SECURE ACCESS</small>
@@ -83,7 +84,7 @@ export default function AdminDashboard() {
   return (
     <div className="dashboard-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand"><span className="brand-mark">S</span><span>SeaCart<small>STAFF CONSOLE</small></span></div>
+        <div className="sidebar-brand"><ThattBrand className="admin-sidebar-logo" /><span>തട്ട്<small>STAFF CONSOLE</small></span></div>
         <div className="sidebar-location"><span className="location-dot" /> OPERATIONS <span className="chevron">⌄</span></div>
         {(["WORKSPACE", "CATALOG", "PEOPLE"] as const).map((group) => <div className="nav-group" key={group}>
           <p className="nav-caption">{group}</p>
@@ -92,9 +93,9 @@ export default function AdminDashboard() {
         <div className="sidebar-bottom"><div className="staff-avatar">{staff.username.slice(0, 1).toUpperCase()}</div><div className="staff-meta"><strong>{staff.username}</strong><span>{staff.is_superuser ? "Superuser" : "Staff account"}</span></div><button className="logout-button" onClick={signOut} aria-label="Sign out">↪</button></div>
       </aside>
       <main className="main-area">
-        <header className="topbar"><div><span className="crumb">SeaCart <span>/</span> {current.label}</span><h1>{section === "overview" ? "Good morning" : current.label}<span className="wave-emoji">{section === "overview" ? " ☀" : ""}</span></h1></div><div className="topbar-right"><span className="today-label">{new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" }).format(new Date())}</span><div className="top-avatar">{staff.username.slice(0, 1).toUpperCase()}</div></div></header>
+        <header className="topbar"><div><span className="crumb">തട്ട് <span>/</span> {current.label}</span><h1>{section === "overview" ? "Good morning" : current.label}<span className="wave-emoji">{section === "overview" ? " ☀" : ""}</span></h1></div><div className="topbar-right"><span className="today-label">{new Intl.DateTimeFormat("en", { weekday: "short", month: "short", day: "numeric" }).format(new Date())}</span><div className="top-avatar">{staff.username.slice(0, 1).toUpperCase()}</div></div></header>
         {error && <div className="inline-error" role="alert">{error}<button onClick={() => setError("")}>×</button></div>}
-        <div className="page-content">
+        <div key={section} className="page-content">
           {section === "overview" && <Overview stats={stats} onOpen={setSection} />}
           {section === "products" && <ProductsPage onError={setError} />}
           {section === "categories" && <CategoriesPage onError={setError} />}

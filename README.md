@@ -87,6 +87,7 @@ Relevant settings include:
 - `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, and `CSRF_TRUSTED_ORIGINS`
 - PostgreSQL connection values for Docker Compose
 - `OTP_PEPPER`, OTP lifetime, and attempt limits
+- `NEXT_PUBLIC_STORE_PHONE` for the About section contact link (currently `9539833135`; the link is formatted for India; after changing it, rebuild the frontend)
 - `SMS_PROVIDER=console` for local development or `SMS_PROVIDER=twilio` with Twilio credentials
 - JWT refresh-cookie security and SameSite options
 

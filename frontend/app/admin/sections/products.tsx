@@ -8,6 +8,16 @@ type Category = { id: number; name: string; kind: string; parent: number | null 
 type Product = { id: number; name: string; slug: string; description: string; image: string; category: number; category_name: string; price_per_unit: string; unit: string; fish_type: string; available_quantity: string; minimum_quantity: string; quantity_step: string; is_active: boolean; is_featured: boolean };
 type Props = { onError: (message: string) => void };
 
+function productImageUrl(value: string | null | undefined) {
+  if (!value) return "";
+  try {
+    const url = new URL(value, "http://thatt.local");
+    return url.pathname.startsWith("/media/") ? `${url.pathname}${url.search}` : value;
+  } catch {
+    return value;
+  }
+}
+
 export default function ProductsPage({ onError }: Props) {
   const [page, setPage] = useState<Page<Product> | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -60,7 +70,7 @@ export default function ProductsPage({ onError }: Props) {
     <div className="toolbar"><div className="search-box"><span>⌕</span><input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (setPageNumber(1), setQuery(search.trim()))} placeholder="Search products" /><kbd>↵</kbd></div><div className="toolbar-actions"><button className="secondary-button" onClick={() => { setEditing(null); setModal(true); }}>＋ Add product</button></div></div>
     <div className="panel table-panel"><div className="panel-heading"><div><h2>Store products</h2><p>{page?.count ?? 0} products · Manage pricing, stock, and visibility</p></div><button className="icon-button" onClick={() => void load()} title="Refresh">↻</button></div>
       <div className="table-scroll"><table><thead><tr><th>PRODUCT</th><th>CATEGORY</th><th>PRICE</th><th>AVAILABLE</th><th>STATUS</th><th /></tr></thead><tbody>
-        {page?.results.map((product) => <tr key={product.id}><td><div className="product-cell"><div className="product-thumb">{product.image ? <img src={product.image} alt="" /> : <span>🐟</span>}</div><span><strong>{product.name}</strong><small>{product.slug}</small></span></div></td><td>{product.category_name}<small className="subcell">{product.fish_type === "sea" ? "Sea fish" : product.fish_type === "freshwater" ? "Freshwater" : product.unit}</small></td><td><strong>₹{Number(product.price_per_unit).toFixed(2)}</strong><small className="subcell">per {product.unit === "kg" ? "kg" : "item"}</small></td><td>{product.available_quantity} {product.unit}</td><td><span className={`status-pill ${product.is_active ? "success" : "neutral"}`}><i />{product.is_active ? "Active" : "Archived"}</span></td><td><div className="row-actions"><button onClick={() => { setEditing(product); setModal(true); }}>Edit</button>{product.is_active && <button className="danger-link" onClick={() => void archive(product)}>Archive</button>}</div></td></tr>)}
+        {page?.results.map((product) => <tr key={product.id}><td><div className="product-cell"><div className="product-thumb">{product.image ? <img src={productImageUrl(product.image)} alt="" loading="lazy" decoding="async" /> : <span>🐟</span>}</div><span><strong>{product.name}</strong><small>{product.slug}</small></span></div></td><td>{product.category_name}<small className="subcell">{product.fish_type === "sea" ? "Sea fish" : product.fish_type === "freshwater" ? "Freshwater" : product.unit}</small></td><td><strong>₹{Number(product.price_per_unit).toFixed(2)}</strong><small className="subcell">per {product.unit === "kg" ? "kg" : "item"}</small></td><td>{product.available_quantity} {product.unit}</td><td><span className={`status-pill ${product.is_active ? "success" : "neutral"}`}><i />{product.is_active ? "Active" : "Archived"}</span></td><td><div className="row-actions"><button onClick={() => { setEditing(product); setModal(true); }}>Edit</button>{product.is_active && <button className="danger-link" onClick={() => void archive(product)}>Archive</button>}</div></td></tr>)}
         {!page?.results.length && <tr><td colSpan={6}><div className="empty-state"><span>◈</span><strong>No products found</strong><small>Add your first product or try another search.</small></div></td></tr>}
       </tbody></table></div><Pager page={page} pageNumber={pageNumber} setPage={setPageNumber} />
     </div>
@@ -81,14 +91,14 @@ function ProductForm({ product, categories, roots, busy, onCancel, onSubmit }: {
     <label className="span-two">Product name<input name="name" required defaultValue={product?.name ?? ""} placeholder="e.g. Wild caught seer fish" /></label>
     <label className="span-two">Description<textarea name="description" rows={3} defaultValue={product?.description ?? ""} placeholder="Tell customers what makes this product special" /></label>
     <label className="span-two">Product image<input name="image" type="file" accept="image/jpeg,image/png,image/webp" required={!product} /></label>
-    {product?.image && <div className="image-preview span-two"><img src={product.image} alt="Current product" /><small>Current image · Choose a file above to replace it</small></div>}
+    {product?.image && <div className="image-preview span-two"><img src={productImageUrl(product.image)} alt="Current product" loading="lazy" decoding="async" /><small>Current image · Choose a file above to replace it</small></div>}
     <label>Category<ThemedSelect name="category" value={categoryId} onValueChange={(selectedId) => { setCategoryId(selectedId); const choice = categories.find((item) => item.id === Number(selectedId)); const choiceRoot = choice?.parent ? roots.find((item) => item.id === choice.parent) : choice; const fish = choiceRoot?.kind === "fish"; setUnit(fish ? "kg" : "each"); setMinimum(fish ? "0.5" : "1"); setStep(fish ? "0.5" : "1"); }} options={[{ value: "", label: "Choose category" }, ...categories.map((item) => ({ value: String(item.id), label: item.parent ? `↳ ${item.name}` : item.name }))]} /></label>
-    <label>Price per {isFish ? "kg" : "unit"}<input name="price_per_unit" type="number" min="0.01" step="0.01" required defaultValue={product?.price_per_unit ?? ""} /></label>
-    <label>Pricing unit<ThemedSelect name="unit" value={unit} onValueChange={setUnit} options={[{ value: "kg", label: "Kilogram" }, { value: "each", label: "Each" }]} /></label>
+    <label>Price per {unit === "kg" ? "kg" : "item"}<input name="price_per_unit" type="number" min="0.01" step="0.01" required defaultValue={product?.price_per_unit ?? ""} /></label>
+    <label>Pricing unit<ThemedSelect name="unit" value={unit} onValueChange={setUnit} disabled={isFish} options={[{ value: "kg", label: "Kilogram" }, { value: "each", label: "Each" }]} />{isFish && <small>Fish products are always priced and stocked by kilogram.</small>}</label>
     {isFish ? <label>Fish type<ThemedSelect name="fish_type" defaultValue={product?.fish_type ?? "sea"} options={[{ value: "sea", label: "Sea fish" }, { value: "freshwater", label: "Freshwater fish" }]} /></label> : <input type="hidden" name="fish_type" value="" />}
-    <label>Available quantity<input name="available_quantity" type="number" min="0" step="0.001" required defaultValue={product?.available_quantity ?? "0"} /></label>
-    <label>Minimum quantity<input name="minimum_quantity" type="number" min="0.001" step="0.001" required value={minimum} onChange={(e) => setMinimum(e.target.value)} /></label>
-    <label>Quantity step<input name="quantity_step" type="number" min="0.001" step="0.001" required value={step} onChange={(e) => setStep(e.target.value)} /></label>
+    <label>Available quantity ({unit})<input name="available_quantity" type="number" min="0" step={unit === "kg" ? "0.001" : "1"} required defaultValue={product?.available_quantity ?? "0"} /></label>
+    <label>Minimum quantity ({unit})<input name="minimum_quantity" type="number" min={unit === "kg" ? "0.001" : "1"} step={unit === "kg" ? "0.001" : "1"} required value={minimum} onChange={(e) => setMinimum(e.target.value)} /></label>
+    <label>Quantity step ({unit})<input name="quantity_step" type="number" min={unit === "kg" ? "0.001" : "1"} step={unit === "kg" ? "0.001" : "1"} required value={step} onChange={(e) => setStep(e.target.value)} /></label>
     <label className="check-label"><input name="is_featured" type="checkbox" value="true" defaultChecked={product?.is_featured ?? false} /> Feature this product</label>
     <label className="check-label"><input name="is_active" type="checkbox" value="true" defaultChecked={product?.is_active ?? true} /> Visible in storefront</label>
     <div className="form-footer span-two"><button type="button" className="secondary-button" onClick={onCancel}>Cancel</button><button className="primary-button" disabled={busy}>{busy ? "Saving…" : product ? "Save changes" : "Create product"}</button></div>

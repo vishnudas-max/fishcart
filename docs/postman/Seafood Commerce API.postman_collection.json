@@ -55,6 +55,10 @@
       "value": ""
     },
     {
+      "key": "productReviewId",
+      "value": ""
+    },
+    {
       "key": "processingOptionId",
       "value": ""
     },
@@ -1279,6 +1283,70 @@
             }
           },
           "description": "Reason codes: out_of_stock, delivery_unavailable, operational_issue, customer_request. The saved message appears in customer order history."
+        }
+      ]
+    },
+    {
+      "name": "Product reviews",
+      "item": [
+        {
+          "name": "List reviews for a product",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/catalog/products/{{productSlug}}/reviews/"
+          },
+          "description": "Public endpoint returns visible reviews. An authenticated customer can also see their own hidden review. Responses do not expose customer usernames or phone numbers."
+        },
+        {
+          "name": "Create verified-purchase review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Fresh and cleaned well\"\n}"
+            },
+            "url": "{{baseUrl}}/api/catalog/products/{{productSlug}}/reviews/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('productReviewId', String(pm.response.json().id));"
+                ]
+              }
+            }
+          ],
+          "description": "Requires customer access token and a completed order containing this product. One review per customer per product; rating is 1-5."
+        },
+        {
+          "name": "Update my review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Updated review\"\n}"
+            },
+            "url": "{{baseUrl}}/api/catalog/reviews/{{productReviewId}}/"
+          },
+          "description": "Only the review owner can update or delete this review."
+        },
+        {
+          "name": "Delete my review",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/catalog/reviews/{{productReviewId}}/"
+          }
         }
       ]
     }

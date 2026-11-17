@@ -34,6 +34,7 @@ services:
       context: ./frontend
       args:
         BACKEND_URL: http://backend:8000
+        NEXT_PUBLIC_STORE_PHONE: ${NEXT_PUBLIC_STORE_PHONE:-9539833135}
     environment:
       BACKEND_URL: http://backend:8000
       NODE_ENV: production
