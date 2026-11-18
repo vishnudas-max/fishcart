@@ -151,13 +151,13 @@ class StaffUserViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsActiveStaff]
     serializer_class = StaffUserSerializer
     pagination_class = StaffPagination
-    queryset = User.objects.annotate(address_count=Count("addresses", distinct=True)).order_by("-date_joined")
+    queryset = User.objects.filter(is_staff=False).annotate(address_count=Count("addresses", distinct=True)).order_by("-date_joined")
 
     def get_queryset(self):
         queryset = super().get_queryset()
         search = self.request.query_params.get("search", "").strip()
         if search:
-            queryset = queryset.filter(Q(username__icontains=search) | Q(phone_number__icontains=search))
+            queryset = queryset.filter(Q(username__icontains=search) | Q(email__icontains=search) | Q(phone_number__icontains=search))
         return queryset
 
     @action(detail=True, methods=["patch"], url_path="status")
@@ -215,7 +215,7 @@ class StaffOrderViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(status=status_value)
         search = self.request.query_params.get("search", "").strip()
         if search:
-            search_filter = Q(user__username__icontains=search) | Q(user__phone_number__icontains=search) | Q(items__product_name__icontains=search)
+            search_filter = Q(user__username__icontains=search) | Q(user__email__icontains=search) | Q(user__phone_number__icontains=search) | Q(items__product_name__icontains=search)
             if search.isdecimal():
                 search_filter |= Q(pk=int(search))
             queryset = queryset.filter(search_filter).distinct()

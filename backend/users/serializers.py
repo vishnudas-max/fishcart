@@ -7,22 +7,19 @@ User = get_user_model()
 
 
 class OTPRequestSerializer(serializers.Serializer):
-    phone_number = serializers.CharField(max_length=16)
+    email = serializers.EmailField(max_length=254)
 
-    def validate_phone_number(self, value):
-        normalized = value.strip()
-        if not re.fullmatch(r"\+[1-9]\d{7,14}", normalized):
-            raise serializers.ValidationError("Enter a phone number in E.164 format, such as +14155552671.")
-        return normalized
+    def validate_email(self, value):
+        return value.strip().lower()
 
 
 class OTPVerifySerializer(OTPRequestSerializer):
     code = serializers.RegexField(r"^\d{6}$")
-    username = serializers.CharField(max_length=150, required=False)
+    username = serializers.CharField(max_length=150, required=False, validators=User._meta.get_field("username").validators)
 
     def validate(self, attrs):
         username = attrs.get("username")
-        if username and User.objects.filter(username__iexact=username).exclude(phone_number=attrs["phone_number"]).exists():
+        if username and User.objects.filter(username__iexact=username).exclude(email=attrs["email"]).exists():
             raise serializers.ValidationError({"username": "This username is unavailable."})
         return attrs
 
@@ -32,8 +29,19 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "username", "first_name", "last_name", "phone_number", "phone_verified_at", "profile_photo", "default_address")
-        read_only_fields = ("id", "phone_number", "phone_verified_at")
+        fields = ("id", "username", "email", "email_verified_at", "first_name", "last_name", "phone_number", "phone_verified_at", "profile_photo", "default_address")
+        read_only_fields = ("id", "email", "email_verified_at", "phone_verified_at")
+
+    def validate_phone_number(self, value):
+        if value in (None, ""):
+            return None
+        normalized = value.strip()
+        if not re.fullmatch(r"\+[1-9]\d{7,14}", normalized):
+            raise serializers.ValidationError("Enter a phone number in E.164 format, such as +14155552671.")
+        duplicate = User.objects.filter(phone_number=normalized).exclude(pk=self.instance.pk).exists()
+        if duplicate:
+            raise serializers.ValidationError("This phone number is already used by another account.")
+        return normalized
 
     def get_default_address(self, user):
         address = user.addresses.filter(is_default=True).first()
@@ -65,3 +73,4 @@ class AddressSerializer(serializers.ModelSerializer):
         if (lat is None) != (lng is None):
             raise serializers.ValidationError("Latitude and longitude must be provided together.")
         return attrs
+import re

@@ -10,4 +10,4 @@ COPY . .
 RUN mkdir -p /app/media && chown -R app:app /app
 USER app
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn backend.wsgi:application --bind 0.0.0.0:8000 --workers ${WEB_CONCURRENCY:-3} --timeout ${GUNICORN_TIMEOUT_SECONDS:-60} --access-logfile - --error-logfile -"]

@@ -9,7 +9,7 @@ class DeliveryServiceAreaSerializer(serializers.ModelSerializer):
     configured = serializers.SerializerMethodField()
     class Meta:
         model = DeliveryServiceArea
-        fields = ("latitude", "longitude", "radius_km", "configured", "updated_at")
+        fields = ("latitude", "longitude", "max_delivery_distance_km", "free_delivery_km", "delivery_fee_per_km", "configured", "updated_at")
         read_only_fields = ("configured", "updated_at")
     def get_configured(self, obj):
         return obj.latitude is not None and obj.longitude is not None
@@ -33,14 +33,33 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
-    phone_number = serializers.CharField(source="user.phone_number", read_only=True)
+    phone_number = serializers.CharField(source="user.phone_number", read_only=True, allow_null=True)
+    email = serializers.EmailField(source="user.email", read_only=True, allow_null=True)
     is_preorder = serializers.BooleanField(read_only=True)
     cancellation_reason_label = serializers.CharField(source="get_cancellation_reason_display", read_only=True)
 
     class Meta:
         model = Order
-        fields = ("id", "user_id", "username", "phone_number", "address_snapshot", "fulfillment_type", "is_preorder", "scheduled_for", "status", "subtotal", "gst_total", "delivery_fee", "total", "stock_reserved", "customer_note", "staff_note", "cancellation_reason", "cancellation_reason_label", "cancellation_message", "items", "created_at", "updated_at")
+        fields = ("id", "user_id", "username", "email", "phone_number", "address_snapshot", "fulfillment_type", "is_preorder", "scheduled_for", "status", "subtotal", "gst_total", "delivery_distance_km", "delivery_free_distance_km", "delivery_fee_per_km", "delivery_fee", "total", "stock_reserved", "customer_note", "staff_note", "cancellation_reason", "cancellation_reason_label", "cancellation_message", "items", "created_at", "updated_at")
         read_only_fields = fields
+
+
+class DeliveryQuoteSerializer(serializers.Serializer):
+    address_id = serializers.IntegerField(min_value=1, required=False)
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, min_value=-90, max_value=90, required=False)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, min_value=-180, max_value=180, required=False)
+
+    def validate(self, attrs):
+        has_saved_address = "address_id" in attrs
+        has_latitude = "latitude" in attrs
+        has_longitude = "longitude" in attrs
+        if has_saved_address and (has_latitude or has_longitude):
+            raise serializers.ValidationError("Provide a saved address ID or map coordinates, not both.")
+        if not has_saved_address and has_latitude != has_longitude:
+            raise serializers.ValidationError("Provide both latitude and longitude.")
+        if not has_saved_address and not has_latitude:
+            raise serializers.ValidationError("A saved address or pinned map coordinates are required.")
+        return attrs
 
 
 class OrderCreateSerializer(serializers.Serializer):

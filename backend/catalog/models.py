@@ -31,6 +31,8 @@ class Category(models.Model):
         constraints = [models.UniqueConstraint(fields=["parent", "name"], name="unique_category_name_per_parent")]
 
     def clean(self):
+        if self.pk and self.parent_id == self.pk:
+            raise ValidationError({"parent": "A category cannot be its own parent."})
         if self.parent_id:
             if self.parent.parent_id:
                 raise ValidationError({"parent": "Categories can only have one subcategory level."})

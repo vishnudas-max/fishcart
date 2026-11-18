@@ -163,3 +163,33 @@ html{scroll-behavior:smooth}body{font-family:'Plus Jakarta Sans','DM Sans',sans-
 @keyframes content-enter{from{opacity:.65;transform:translate3d(0,10px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @keyframes popover-enter{from{opacity:0;transform:translate3d(0,-5px,0) scale(.99)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.profile-pill-loading,.modal-backdrop.customer-backdrop,.modal-backdrop.drawer-backdrop,.review-backdrop,.customer-auth-card,.customize-card,.review-dialog,.cart-drawer,.account-sidebar,.sidebar,.account-content,.page-content,.account-popover{animation:none!important}[data-scroll-reveal].will-reveal{opacity:1;transform:none}[data-scroll-reveal].will-reveal.scroll-visible{transition:none}}
+.delivery-quote-card{display:grid;gap:12px;padding:16px;border:1px solid #e8dfe7;border-radius:16px;background:linear-gradient(145deg,#fff,#fdfafd);box-shadow:0 5px 18px #33133008;color:#493a49;animation:delivery-card-enter .24s ease-out both}
+.delivery-quote-card.is-available{border-color:#cfe3d9;background:linear-gradient(145deg,#fff,#f7fbf8)}
+.delivery-quote-card.is-outside{border-color:#ecd9c5;background:linear-gradient(145deg,#fff,#fffbf5)}
+.delivery-quote-heading,.delivery-quote-state{display:flex;align-items:center;gap:11px;min-width:0}
+.delivery-state-icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border:1px solid #e9ddea;border-radius:12px;background:#fbf3fa;color:#830082;font-size:17px;font-weight:800}
+.is-available .delivery-state-icon{border-color:#d1e7da;background:#eaf6ef;color:#267352}
+.is-outside .delivery-state-icon{border-color:#f0dfc7;background:#fff4e3;color:#a46419}
+.delivery-quote-title,.delivery-quote-state>div{display:grid;gap:3px;min-width:0}
+.delivery-quote-title strong,.delivery-quote-state strong{font-size:14px;font-weight:750;color:#342c36}
+.delivery-quote-title span,.delivery-quote-state p{margin:0;color:#817781;font-size:12px;line-height:1.45}
+.delivery-fee-pill{margin-left:auto;padding:7px 11px;border:1px solid #e9d9e9;border-radius:999px;background:#fff;color:#830082;font-size:13px;font-weight:800;white-space:nowrap}
+.is-available .delivery-fee-pill{border-color:#d5e8dd;background:#f2faf5;color:#286d4d}
+.delivery-quote-breakdown{display:flex;align-items:center;flex-wrap:wrap;gap:7px 16px;padding:0 0 1px 47px;color:#756a75;font-size:11px}
+.delivery-quote-breakdown>span{display:inline-flex;gap:4px;align-items:center}
+.delivery-quote-breakdown>span b{color:#4a3b4b;font-weight:700}
+.delivery-quote-breakdown>strong{display:inline-flex;gap:7px;margin-left:auto;color:#665767;font-weight:600}
+.delivery-quote-breakdown>strong b{color:#286d4d;font-size:12px}
+.delivery-map-preview{overflow:hidden;border:1px solid #e5e0e5;border-radius:12px;background:#f7f4f1}
+.delivery-map-preview iframe{display:block;width:100%;height:158px;border:0}
+.delivery-map-legend{display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px;padding:8px 10px;color:#665767;font-size:10px}
+.delivery-map-legend span{display:inline-flex;align-items:center;gap:5px}
+.market-map-pin{width:8px;height:8px;border-radius:50%;background:#830082;box-shadow:0 0 0 3px #83008226}
+.delivery-quote-attribution{margin:0;color:#918590;font-size:10px;line-height:1.45}
+.delivery-quote-spinner{display:block;flex:0 0 20px;width:20px;height:20px;margin:8px;border:2px solid #eadfea;border-top-color:#830082;border-radius:50%;animation:delivery-quote-spin .8s linear infinite}
+@keyframes delivery-card-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes delivery-quote-spin{to{transform:rotate(360deg)}}
+@media(max-width:520px){.delivery-quote-card{padding:13px;border-radius:14px}.delivery-quote-heading{gap:9px}.delivery-fee-pill{padding:6px 9px;font-size:12px}.delivery-quote-breakdown{padding-left:0;gap:7px 12px}.delivery-quote-breakdown>strong{margin-left:0}.delivery-map-preview iframe{height:142px}}
+@media(prefers-reduced-motion:reduce){.delivery-quote-card,.delivery-quote-spinner{animation:none}}
+.order-whatsapp{display:grid;gap:8px;margin:0 0 12px}.order-whatsapp .plum-button{width:100%}.order-whatsapp small{max-width:360px;margin:auto;color:#827781;font-size:9px;line-height:1.55}
+.auth-code-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:-4px}.auth-resend:disabled{color:#a89aa6;cursor:not-allowed}

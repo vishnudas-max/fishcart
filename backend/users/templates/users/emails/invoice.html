@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invoice {{ invoice_number }} · തട്ട്</title></head>
+  <body style="margin:0;background:#f6f3f4;color:#182b39;font-family:Arial,Helvetica,sans-serif">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f6f3f4"><tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #eadfe7;border-radius:16px">
+        <tr><td style="padding:28px 32px;border-bottom:1px solid #eee7ec"><div style="font-size:26px;font-weight:700;color:#870080">തട്ട്</div><h1 style="margin:14px 0 4px;font-size:24px">Invoice {{ invoice_number }}</h1><p style="margin:0;color:#65737d">Order #{{ order_number }} · {{ order_date }}</p></td></tr>
+        <tr><td style="padding:24px 32px"><p style="margin:0 0 18px">Prepared for <strong>{{ customer_name }}</strong></p><table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="border-collapse:collapse;text-align:left"><thead><tr style="background:#fff8fe"><th>Item</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>{% for item in items %}<tr><td style="border-bottom:1px solid #eee7ec">{{ item.name }}</td><td style="border-bottom:1px solid #eee7ec">{{ item.quantity }}</td><td style="border-bottom:1px solid #eee7ec">₹{{ item.unit_price }}</td><td style="border-bottom:1px solid #eee7ec">₹{{ item.total }}</td></tr>{% endfor %}</tbody></table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="7" style="margin-top:18px"><tr><td>Subtotal</td><td align="right">₹{{ subtotal }}</td></tr><tr><td>GST</td><td align="right">₹{{ gst_total }}</td></tr><tr><td>Delivery</td><td align="right">₹{{ delivery_fee }}</td></tr><tr><td style="border-top:1px solid #eadfe7;font-size:18px;font-weight:bold">Total</td><td align="right" style="border-top:1px solid #eadfe7;font-size:18px;font-weight:bold;color:#870080">₹{{ total }}</td></tr></table>
+          <p style="margin:24px 0 0;padding:12px;border-radius:8px;background:#fff8fe;color:#65737d;font-size:13px">Invoice sending is not enabled yet; this template is ready for a later invoice workflow.</p>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body>
+</html>

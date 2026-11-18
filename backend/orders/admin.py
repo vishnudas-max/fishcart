@@ -22,7 +22,7 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "fulfillment_type", "scheduled_for", "status", "total", "created_at")
     list_filter = ("fulfillment_type", "status", "created_at", "scheduled_for")
     search_fields = ("user__username", "user__phone_number", "id")
-    readonly_fields = ("user", "address", "address_snapshot", "fulfillment_type", "scheduled_for", "status", "total", "stock_reserved", "customer_note", "staff_note", "cancellation_message", "created_at", "updated_at")
+    readonly_fields = ("user", "address", "address_snapshot", "fulfillment_type", "scheduled_for", "status", "subtotal", "gst_total", "delivery_distance_km", "delivery_free_distance_km", "delivery_fee_per_km", "delivery_fee", "total", "stock_reserved", "customer_note", "staff_note", "cancellation_message", "created_at", "updated_at")
     inlines = (OrderItemInline,)
 
     def get_queryset(self, request):
@@ -39,8 +39,8 @@ class OrderItemAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryServiceArea)
 class DeliveryServiceAreaAdmin(admin.ModelAdmin):
-    list_display = ("latitude", "longitude", "radius_km", "updated_at")
-    fields = ("latitude", "longitude", "radius_km", "updated_at")
+    list_display = ("latitude", "longitude", "max_delivery_distance_km", "free_delivery_km", "delivery_fee_per_km", "updated_at")
+    fields = ("latitude", "longitude", "max_delivery_distance_km", "free_delivery_km", "delivery_fee_per_km", "updated_at")
     readonly_fields = ("updated_at",)
     def has_add_permission(self, request):
         return not DeliveryServiceArea.objects.exists() and super().has_add_permission(request)

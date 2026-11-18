@@ -1,0 +1,14 @@
+തട്ട് | Order invoice
+
+Invoice {{ invoice_number }}
+Order {{ order_number }} · {{ order_date }}
+
+Customer: {{ customer_name }}
+{% for item in items %}{{ item.name }} — {{ item.quantity }} × ₹{{ item.unit_price }} = ₹{{ item.total }}
+{% endfor %}
+Subtotal: ₹{{ subtotal }}
+GST: ₹{{ gst_total }}
+Delivery: ₹{{ delivery_fee }}
+Total: ₹{{ total }}
+
+This is an invoice email template. Invoice delivery is not enabled yet.

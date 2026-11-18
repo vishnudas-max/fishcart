@@ -9,9 +9,9 @@ User = get_user_model()
 
 @admin.register(User)
 class AppUserAdmin(UserAdmin):
-    list_display = ("username", "phone_number", "phone_verified_at", "is_staff", "is_active")
-    search_fields = ("username", "phone_number")
-    fieldsets = UserAdmin.fieldsets + (("Contact", {"fields": ("phone_number", "phone_verified_at", "profile_photo")}),)
+    list_display = ("username", "email", "phone_number", "email_verified_at", "is_staff", "is_active")
+    search_fields = ("username", "email", "phone_number")
+    fieldsets = UserAdmin.fieldsets + (("Contact", {"fields": ("email_verified_at", "phone_number", "phone_verified_at", "profile_photo")}),)
     add_fieldsets = UserAdmin.add_fieldsets + (("Contact", {"fields": ("phone_number",)}),)
 
 

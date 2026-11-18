@@ -9,12 +9,15 @@ from .validators import validate_profile_image
 
 
 class UserManager(DjangoUserManager):
-    """Require one normalized, unique E.164 phone number for every user."""
+    """Normalize optional profile phone numbers while Django manages users."""
 
     use_in_migrations = True
 
     def _require_unique_phone_number(self, extra_fields):
-        phone_number = str(extra_fields.get("phone_number", "")).strip()
+        phone_number = (extra_fields.get("phone_number") or "").strip()
+        if not phone_number:
+            extra_fields["phone_number"] = None
+            return
         if not re.fullmatch(r"\+[1-9]\d{7,14}", phone_number):
             raise ValueError("A valid phone_number in E.164 format is required (for example, +14155552671).")
         if self.model._default_manager.filter(phone_number=phone_number).exists():
@@ -22,30 +25,42 @@ class UserManager(DjangoUserManager):
         extra_fields["phone_number"] = phone_number
 
     def create_user(self, username, email=None, password=None, **extra_fields):
+        email = email.strip().lower() if email else None
         self._require_unique_phone_number(extra_fields)
         return super().create_user(username, email=email, password=password, **extra_fields)
 
     def create_superuser(self, username, email=None, password=None, **extra_fields):
+        email = email.strip().lower() if email else None
         self._require_unique_phone_number(extra_fields)
         return super().create_superuser(username, email=email, password=password, **extra_fields)
 
 
 class User(AbstractUser):
     """Application user; Django's AbstractUser supplies the abstract auth base."""
-    phone_number = models.CharField(max_length=16, unique=True, db_index=True)
-    phone_verified_at = models.DateTimeField(null=True, blank=True)
+    email = models.EmailField(max_length=254, unique=True, null=True, blank=True)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+    phone_number = models.CharField(max_length=16, unique=True, db_index=True, null=True, blank=True)
+    phone_verified_at = models.DateTimeField(null=True, blank=True)  # legacy verification metadata
     profile_photo = models.ImageField(upload_to="profiles/%Y/%m/", blank=True, validators=[validate_profile_image])
     objects = UserManager()
 
     # Django's createsuperuser prompts for these fields after USERNAME_FIELD.
-    REQUIRED_FIELDS = ["phone_number"]
+    REQUIRED_FIELDS = []
+
+    def save(self, *args, **kwargs):
+        original_email = self.email
+        self.email = self.email.strip().lower() if self.email else None
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and original_email != self.email:
+            kwargs["update_fields"] = set(update_fields) | {"email"}
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.phone_number
+        return self.email or self.phone_number or self.username
 
 
 class LoginOTP(models.Model):
-    phone_number = models.CharField(max_length=16, db_index=True)
+    email = models.EmailField(max_length=254, db_index=True)
     code_digest = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     expires_at = models.DateTimeField(db_index=True)
@@ -53,10 +68,10 @@ class LoginOTP(models.Model):
     consumed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=["phone_number", "created_at"])]
+        indexes = [models.Index(fields=["email", "created_at"], name="users_login_email_created_idx")]
 
     def __str__(self):
-        return f"OTP for {self.phone_number}"
+        return "Email login OTP"
 
 
 class Address(models.Model):

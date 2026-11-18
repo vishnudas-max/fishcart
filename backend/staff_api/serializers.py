@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -13,8 +15,23 @@ class StaffDeliveryServiceAreaSerializer(serializers.ModelSerializer):
     configured = serializers.SerializerMethodField()
     class Meta:
         model = DeliveryServiceArea
-        fields = ("latitude", "longitude", "radius_km", "configured", "updated_at")
+        fields = ("latitude", "longitude", "max_delivery_distance_km", "free_delivery_km", "delivery_fee_per_km", "configured", "updated_at")
         read_only_fields = ("configured", "updated_at")
+
+    def validate(self, attrs):
+        current = self.instance
+        maximum = attrs.get("max_delivery_distance_km", current.max_delivery_distance_km if current else Decimal("50.00"))
+        free = attrs.get("free_delivery_km", current.free_delivery_km if current else Decimal("5.00"))
+        if free > maximum:
+            raise serializers.ValidationError({"free_delivery_km": "Free delivery distance cannot exceed the maximum delivery distance."})
+        return attrs
+
+    def update(self, instance, validated_data):
+        try:
+            return super().update(instance, validated_data)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages) from exc
+
     def get_configured(self, obj):
         return obj.latitude is not None and obj.longitude is not None
 
@@ -29,7 +46,7 @@ class StaffUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "username", "first_name", "last_name", "phone_number", "phone_verified_at", "is_active", "date_joined", "address_count")
+        fields = ("id", "username", "email", "email_verified_at", "first_name", "last_name", "phone_number", "is_active", "date_joined", "address_count")
 
 
 class StaffAddressSerializer(serializers.ModelSerializer):

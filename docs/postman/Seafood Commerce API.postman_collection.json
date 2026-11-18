@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c981b0bd-68b1-4e8e-aeeb-98c04c9a9825",
     "name": "Fishcart Seafood Commerce API",
-    "description": "Current Django REST API collection. Set baseUrl, use customer OTP or staff session login, then test each folder. Postman retains refresh/session cookies. OTP verification saves the short-lived access token in a collection variable. Do not share an authenticated collection export.",
+    "description": "Current Django REST API collection for customer email OTP, customer JWT, and staff session workflows. Order status values: confirmed, out_for_delivery, completed, cancelled. Delivery uses server-calculated straight-line distance. Set baseUrl, configure a mailbox and staff credentials, then run requests in the documented order. Postman retains cookies; never export or share a collection after authentication.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,16 +11,16 @@
       "value": "http://localhost:8000"
     },
     {
+      "key": "email",
+      "value": "customer@example.test"
+    },
+    {
       "key": "csrfToken",
       "value": ""
     },
     {
       "key": "accessToken",
       "value": ""
-    },
-    {
-      "key": "phoneNumber",
-      "value": "+919876543210"
     },
     {
       "key": "otpCode",
@@ -79,7 +79,7 @@
       "value": ""
     },
     {
-      "key": "staffUserId",
+      "key": "customerId",
       "value": ""
     },
     {
@@ -93,8 +93,18 @@
       "type": "default"
     },
     {
-      "key": "deliveryRadiusKm",
+      "key": "maxDeliveryDistanceKm",
       "value": "50.00",
+      "type": "default"
+    },
+    {
+      "key": "freeDeliveryKm",
+      "value": "5.00",
+      "type": "default"
+    },
+    {
+      "key": "deliveryFeePerKm",
+      "value": "10.00",
       "type": "default"
     },
     {
@@ -123,9 +133,11 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "const token = pm.cookies.get('csrftoken');",
-                  "if (token) pm.collectionVariables.set('csrfToken', token);"
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const token = pm.cookies.get('csrftoken'); if (token) pm.collectionVariables.set('csrfToken', token); }"
                 ]
               }
             }
@@ -147,10 +159,52 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone_number\": \"{{phoneNumber}}\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/otp/request/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 202', function () { pm.response.to.have.status(202); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend OTP (invalidates prior code)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/otp/request/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 202', function () { pm.response.to.have.status(202); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ],
+          "description": "Call this endpoint to request another code. Earlier unconsumed codes are invalidated before the replacement is created."
         },
         {
           "name": "Verify OTP (captures access token)",
@@ -158,11 +212,11 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "  const data = pm.response.json();",
-                  "  if (data.access) pm.collectionVariables.set('accessToken', data.access);",
-                  "}"
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.access) pm.collectionVariables.set('accessToken', data.access); }"
                 ]
               }
             }
@@ -177,7 +231,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone_number\": \"{{phoneNumber}}\",\n  \"code\": \"{{otpCode}}\",\n  \"username\": \"{{username}}\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otpCode}}\",\n  \"username\": \"{{username}}\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/otp/verify/"
           }
@@ -188,11 +242,11 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "  const data = pm.response.json();",
-                  "  if (data.access) pm.collectionVariables.set('accessToken', data.access);",
-                  "}"
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.access) pm.collectionVariables.set('accessToken', data.access); }"
                 ]
               }
             }
@@ -219,7 +273,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/me/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update username/profile (PATCH)",
@@ -240,7 +306,19 @@
               "raw": "{\n  \"username\": \"{{username}}\",\n  \"first_name\": \"Asha\",\n  \"last_name\": \"Customer\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/me/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update profile photo (multipart)",
@@ -263,7 +341,19 @@
               ]
             },
             "url": "{{baseUrl}}/api/auth/me/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Logout customer",
@@ -280,7 +370,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/logout/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -298,7 +400,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/addresses/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Create address",
@@ -316,7 +430,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"label\": \"Home\",\n  \"recipient_name\": \"Asha Customer\",\n  \"phone_number\": \"{{phoneNumber}}\",\n  \"address_line1\": \"12 Example Road\",\n  \"address_line2\": \"Apartment 4\",\n  \"landmark\": \"Near market\",\n  \"city\": \"Kochi\",\n  \"state\": \"Kerala\",\n  \"postal_code\": \"682001\",\n  \"country_code\": \"IN\",\n  \"latitude\": 9.9312,\n  \"longitude\": 76.2673,\n  \"is_default\": true\n}"
+              "raw": "{\n  \"label\": \"Home\",\n  \"recipient_name\": \"Asha Customer\",\n  \"email\": \"{{email}}\",\n  \"address_line1\": \"12 Example Road\",\n  \"address_line2\": \"Apartment 4\",\n  \"landmark\": \"Near market\",\n  \"city\": \"Kochi\",\n  \"state\": \"Kerala\",\n  \"postal_code\": \"682001\",\n  \"country_code\": \"IN\",\n  \"latitude\": 9.9312,\n  \"longitude\": 76.2673,\n  \"is_default\": true\n}"
             },
             "url": "{{baseUrl}}/api/auth/addresses/"
           },
@@ -326,12 +440,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('addressId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('addressId', String(data.id)); }"
                 ]
               }
             }
           ],
-          "description": "Latitude and longitude must be provided together. Use a pinned location inside the configured delivery radius for checkout."
+          "description": "Latitude and longitude must be provided together. Pin a location for the customer address and quote its straight-line distance before checkout."
         },
         {
           "name": "Retrieve address",
@@ -344,7 +460,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update address",
@@ -365,7 +493,19 @@
               "raw": "{\n  \"label\": \"Work\",\n  \"address_line1\": \"99 New Street\",\n  \"city\": \"Chennai\",\n  \"latitude\": 13.05,\n  \"longitude\": 80.25\n}"
             },
             "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Set default address",
@@ -378,7 +518,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/set-default/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Delete address",
@@ -391,7 +543,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get customer address detail",
@@ -404,7 +568,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/auth/addresses/{{addressId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -416,7 +592,19 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/catalog/categories/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List products (pagination and filters)",
@@ -471,14 +659,38 @@
                 }
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Product detail by slug",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/catalog/products/{{productSlug}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -496,7 +708,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/cart/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Add cart item",
@@ -524,7 +748,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('cartItemId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('cartItemId', String(data.id)); }"
                 ]
               }
             }
@@ -549,7 +775,19 @@
               "raw": "{\n  \"quantity\": \"2.000\",\n  \"processing_option_ids\": [{{processingOptionId}}]\n}"
             },
             "url": "{{baseUrl}}/api/cart/items/{{cartItemId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Remove cart item",
@@ -562,7 +800,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/cart/items/{{cartItemId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Add cart item for preorder (no stock reservation)",
@@ -584,7 +834,20 @@
               "raw": "{\n  \"product_id\": \"{{productId}}\",\n  \"quantity\": \"1.000\",\n  \"processing_option_ids\": [],\n  \"preorder_eligible\": true\n}"
             }
           },
-          "description": "Use for future orders; preorder cart lines do not reserve current stock."
+          "description": "Use for future orders; preorder cart lines do not reserve current stock.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('cartItemId', String(data.id)); }"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -617,12 +880,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('orderId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('orderId', String(data.id)); }"
                 ]
               }
             }
           ],
-          "description": "Requires a configured staff delivery area and a pinned address within its radius. New ASAP orders are confirmed, stock is reserved, and the cart is emptied."
+          "description": "Requires a configured market pin, pinned address within the maximum straight-line delivery distance. The first configured kilometres are free; fee per additional kilometre is charged. New ASAP orders are confirmed, stock is reserved, and the cart is emptied."
         },
         {
           "name": "Create future preorder",
@@ -646,20 +911,22 @@
           },
           "event": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('orderId', String(d.id)); }"
-                ]
-              }
-            },
-            {
               "listen": "prerequest",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.collectionVariables.set('scheduledFor', new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('orderId', String(data.id)); }"
                 ]
               }
             }
@@ -677,7 +944,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/orders/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Order detail",
@@ -690,7 +969,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/orders/{{orderId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Check configured delivery area",
@@ -704,7 +995,53 @@
             ],
             "url": "{{baseUrl}}/api/orders/delivery-area/"
           },
-          "description": "Read market coordinates and service radius used by checkout."
+          "description": "Read delivery pricing configuration used by checkout.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get delivery quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/orders/delivery-quote/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address_id\": \"{{addressId}}\"\n}"
+            }
+          },
+          "description": "Returns straight-line distance, eligibility, free distance and delivery fee. No external routing API is needed.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -717,9 +1054,11 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "const token = pm.cookies.get('csrftoken');",
-                  "if (token) pm.collectionVariables.set('csrfToken', token);"
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const token = pm.cookies.get('csrftoken'); if (token) pm.collectionVariables.set('csrfToken', token); }"
                 ]
               }
             }
@@ -748,21 +1087,57 @@
               "raw": "{\n  \"username\": \"{{staffUsername}}\",\n  \"password\": \"{{staffPassword}}\"\n}"
             },
             "url": "{{baseUrl}}/api/staff/login/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Staff identity",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/me/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Dashboard stats",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/dashboard/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Staff logout",
@@ -775,7 +1150,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/staff/logout/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get delivery area settings",
@@ -784,10 +1171,22 @@
             "header": [],
             "url": "{{baseUrl}}/api/staff/delivery-area/"
           },
-          "description": "Staff-only; returns the market pin and configured radius."
+          "description": "Staff-only; returns the market pin, straight-line delivery radius, free radius, and per-kilometre fee.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Set market location and delivery radius",
+          "name": "Set market location and straight-line delivery pricing",
           "request": {
             "method": "PATCH",
             "header": [
@@ -803,10 +1202,22 @@
             "url": "{{baseUrl}}/api/staff/delivery-area/",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"latitude\": \"{{marketLatitude}}\",\n  \"longitude\": \"{{marketLongitude}}\",\n  \"radius_km\": \"{{deliveryRadiusKm}}\"\n}"
+              "raw": "{\n  \"latitude\": \"{{marketLatitude}}\",\n  \"longitude\": \"{{marketLongitude}}\",\n  \"max_delivery_distance_km\": \"{{maxDeliveryDistanceKm}}\",\n  \"free_delivery_km\": \"{{freeDeliveryKm}}\",\n  \"delivery_fee_per_km\": \"{{deliveryFeePerKm}}\"\n}"
             }
           },
-          "description": "Set both coordinates and a positive radius before checkout."
+          "description": "Set the market map pin, maximum straight-line distance, free first kilometres and per-kilometre fee.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -818,7 +1229,19 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/categories/?page=1&page_size=25&search=fish"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Create top-level category",
@@ -846,7 +1269,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('categoryId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('categoryId', String(data.id)); }"
                 ]
               }
             }
@@ -878,7 +1303,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('subcategoryId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('subcategoryId', String(data.id)); }"
                 ]
               }
             }
@@ -889,7 +1316,19 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update category",
@@ -910,7 +1349,19 @@
               "raw": "{\n  \"description\": \"Updated category description\",\n  \"sort_order\": 1\n}"
             },
             "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Archive category (DELETE is soft archive)",
@@ -923,14 +1374,38 @@
               }
             ],
             "url": "{{baseUrl}}/api/staff/categories/{{categoryId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List/search products",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/products/?page=1&page_size=25&search=salmon&category={{subcategoryId}}&is_active=true"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Create product (multipart; select image file)",
@@ -1020,7 +1495,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('productId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('productId', String(data.id)); if (data.slug) pm.collectionVariables.set('productSlug', data.slug); }"
                 ]
               }
             }
@@ -1047,14 +1524,38 @@
               ]
             },
             "url": "{{baseUrl}}/api/staff/products/{{productId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Retrieve product",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/products/{{productId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update product",
@@ -1075,7 +1576,19 @@
               "raw": "{\n  \"price_per_unit\": \"549.00\",\n  \"available_quantity\": \"15.000\",\n  \"is_featured\": true\n}"
             },
             "url": "{{baseUrl}}/api/staff/products/{{productId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Archive product (DELETE is soft archive)",
@@ -1088,14 +1601,38 @@
               }
             ],
             "url": "{{baseUrl}}/api/staff/products/{{productId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List processing options",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/processing-options/?category={{categoryId}}&search=clean"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Create fish processing option",
@@ -1123,7 +1660,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code >= 200 && pm.response.code < 300) { const d = pm.response.json(); if (d.id !== undefined) pm.collectionVariables.set('processingOptionId', String(d.id)); }"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('processingOptionId', String(data.id)); }"
                 ]
               }
             }
@@ -1134,7 +1673,19 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Update processing option",
@@ -1155,7 +1706,19 @@
               "raw": "{\n  \"price_per_kg\": \"60.00\",\n  \"is_active\": true\n}"
             },
             "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Archive processing option",
@@ -1168,7 +1731,19 @@
               }
             ],
             "url": "{{baseUrl}}/api/staff/processing-options/{{processingOptionId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1180,17 +1755,42 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/users/?page=1&page_size=25&search=asha"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const rows = pm.response.json().results || []; if (rows.length) pm.collectionVariables.set('customerId', String(rows[0].id)); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Customer detail",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/staff/users/{{staffUserId}}/"
-          }
+            "url": "{{baseUrl}}/api/staff/users/{{customerId}}/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Activate/deactivate customer or staff",
+          "name": "Activate/deactivate customer",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1207,15 +1807,40 @@
               "mode": "raw",
               "raw": "{\n  \"is_active\": false\n}"
             },
-            "url": "{{baseUrl}}/api/staff/users/{{staffUserId}}/status/"
-          }
+            "url": "{{baseUrl}}/api/staff/users/{{customerId}}/status/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List/search customer addresses",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/addresses/?page=1&page_size=25&search=Chennai"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const rows = pm.response.json().results || []; if (rows.length) pm.collectionVariables.set('staffAddressId', String(rows[0].id)); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "List orders (including filter examples)",
@@ -1223,14 +1848,39 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/orders/?page=1&page_size=25&preorder=true&status=confirmed&search=fish"
           },
-          "description": "preorder accepts true/false (also 1/0); valid statuses: pending, confirmed, preparing, ready, out_for_delivery, completed, cancelled."
+          "description": "preorder accepts true/false (also 1/0); valid statuses: confirmed, out_for_delivery, completed, cancelled.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const rows = pm.response.json().results || []; if (rows.length) pm.collectionVariables.set('orderId', String(rows[0].id)); }"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Order detail",
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/staff/orders/{{orderId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Manage order status or staff note",
@@ -1248,11 +1898,23 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"preparing\",\n  \"staff_note\": \"Supply confirmed\"\n}"
+              "raw": "{\n  \"status\": \"out_for_delivery\",\n  \"staff_note\": \"Supply confirmed\"\n}"
             },
             "url": "{{baseUrl}}/api/staff/orders/{{orderId}}/manage/"
           },
-          "description": "Move from current state. Forward progression: confirmed to preparing to ready to out_for_delivery to completed. Legacy pending orders may first be confirmed."
+          "description": "Move through confirmed → out_for_delivery → completed. Active orders may be cancelled with a predefined reason.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get customer address by ID",
@@ -1260,7 +1922,19 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/api/staff/addresses/{{staffAddressId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Cancel order with predefined customer message",
@@ -1282,7 +1956,19 @@
               "raw": "{\n  \"status\": \"cancelled\",\n  \"cancellation_reason\": \"out_of_stock\",\n  \"staff_note\": \"\"\n}"
             }
           },
-          "description": "Reason codes: out_of_stock, delivery_unavailable, operational_issue, customer_request. The saved message appears in customer order history."
+          "description": "Reason codes: out_of_stock, delivery_unavailable, operational_issue, customer_request. The saved message appears in customer order history.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1295,15 +1981,33 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/catalog/products/{{productSlug}}/reviews/"
           },
-          "description": "Public endpoint returns visible reviews. An authenticated customer can also see their own hidden review. Responses do not expose customer usernames or phone numbers."
+          "description": "Public endpoint returns visible reviews. An authenticated customer can also see their own hidden review. Responses do not expose customer usernames or phone numbers.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Create verified-purchase review",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1317,7 +2021,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "if (pm.response.code === 201) pm.collectionVariables.set('productReviewId', String(pm.response.json().id));"
+                  "pm.test('Returns expected HTTP 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) { const data = pm.response.json(); if (data.id !== undefined) pm.collectionVariables.set('productReviewId', String(data.id)); }"
                 ]
               }
             }
@@ -1329,8 +2035,14 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -1338,15 +2050,44 @@
             },
             "url": "{{baseUrl}}/api/catalog/reviews/{{productReviewId}}/"
           },
-          "description": "Only the review owner can update or delete this review."
+          "description": "Only the review owner can update or delete this review.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Delete my review",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/catalog/reviews/{{productReviewId}}/"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns expected HTTP 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code !== 204) pm.test('Returns JSON', function () { pm.expect(pm.response.headers.get('Content-Type') || '').to.include('application/json'); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

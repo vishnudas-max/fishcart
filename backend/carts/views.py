@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -14,11 +15,15 @@ def load_cart(user):
 
 
 class CartView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         return Response(CartSerializer(load_cart(request.user), context={"request": request}).data)
 
 
 class CartItemListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = CartItemCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -27,6 +32,8 @@ class CartItemListCreateView(APIView):
 
 
 class CartItemDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def patch(self, request, item_id):
         item = get_object_or_404(CartItem.objects.select_related("product__category").prefetch_related("selected_options__option"), pk=item_id, cart__user=request.user)
         serializer = CartItemUpdateSerializer(data=request.data)

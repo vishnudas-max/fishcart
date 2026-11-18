@@ -14,6 +14,7 @@ from users.models import Address
 
 
 DEMO_PHONE = "+15555550100"  # NANP fictional 555-0100 range; cannot receive real calls/SMS.
+DEMO_EMAIL = "demo.customer@example.test"
 DEMO_USERNAME = "demo_seafood_customer"
 ASSET_DIRECTORY = Path(__file__).resolve().parents[2] / "demo_assets"
 
@@ -61,11 +62,12 @@ class Command(BaseCommand):
             phone_number=DEMO_PHONE,
             defaults={
                 "username": DEMO_USERNAME,
+                "email": DEMO_EMAIL,
                 "first_name": "Demo",
                 "last_name": "Customer",
                 "is_active": True,
                 "is_staff": False,
-                "phone_verified_at": timezone.now(),
+                "email_verified_at": timezone.now(),
             },
         )
         if created:
@@ -89,8 +91,11 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Demo data is ready: 10 demo fish products and a demo customer."))
         self.stdout.write(f"Customer username: {user.username}")
-        self.stdout.write(f"Customer phone for local OTP login: {DEMO_PHONE}")
-        self.stdout.write("The customer has no password; authenticate with OTP. In local console SMS mode, read the OTP in backend logs.")
+        if not user.email:
+            user.email = DEMO_EMAIL
+            user.save(update_fields=["email"])
+        self.stdout.write(f"Customer email for OTP login: {user.email}")
+        self.stdout.write("The customer has no password; authenticate with email OTP and check the configured SMTP inbox for the code.")
 
     def _get_or_create_category(self, name, slug, kind, *, parent=None, sort_order=0):
         category = Category.objects.filter(slug=slug).first()

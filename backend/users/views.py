@@ -3,8 +3,9 @@ from django.contrib.auth import get_user_model
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.utils import timezone
+from django.utils.text import slugify
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import Address
 from .serializers import AddressSerializer, CurrentUserSerializer, OTPRequestSerializer, OTPVerifySerializer
-from .services import create_login_otp, send_sms, verify_login_otp
+from .services import create_login_otp, send_login_otp_email, verify_login_otp
 
 User = get_user_model()
 
@@ -40,10 +41,10 @@ class OTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        phone = serializer.validated_data["phone_number"]
-        code = create_login_otp(phone)
-        send_sms(phone, f"Your verification code is {code}. It expires in 5 minutes.")
-        return Response({"detail": "If the number is eligible, a verification code has been sent."}, status=status.HTTP_202_ACCEPTED)
+        email = serializer.validated_data["email"]
+        code = create_login_otp(email)
+        send_login_otp_email(email, code)
+        return Response({"detail": "If the email is eligible, a verification code has been sent."}, status=status.HTTP_202_ACCEPTED)
 
 
 class OTPVerifyView(APIView):
@@ -53,20 +54,32 @@ class OTPVerifyView(APIView):
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        phone, code = serializer.validated_data["phone_number"], serializer.validated_data["code"]
-        if not verify_login_otp(phone, code):
+        email, code = serializer.validated_data["email"], serializer.validated_data["code"]
+        if not verify_login_otp(email, code):
             return Response({"detail": "Invalid or expired verification code."}, status=status.HTTP_400_BAD_REQUEST)
         requested_username = serializer.validated_data.get("username")
-        user, created = User.objects.get_or_create(phone_number=phone, defaults={"username": requested_username or phone})
+        user = User.objects.filter(email__iexact=email).first()
+        if user and (not user.is_active or user.is_staff):
+            return Response({"detail": "Invalid or expired verification code."}, status=status.HTTP_400_BAD_REQUEST)
+        created = user is None
+        if created:
+            base = requested_username or slugify(email.split("@", 1)[0]) or "customer"
+            username = base[:150]
+            suffix = 1
+            while User.objects.filter(username__iexact=username).exists():
+                tail = f"{suffix}"
+                username = f"{base[:150-len(tail)]}{tail}"
+                suffix += 1
+            user = User.objects.create_user(username=username, email=email)
         if created:
             user.set_unusable_password()
             user.save(update_fields=["password"])
-        if user.phone_verified_at is None:
-            user.phone_verified_at = timezone.now()
-            user.save(update_fields=["phone_verified_at"])
+        if user.email_verified_at is None:
+            user.email_verified_at = timezone.now()
+            user.save(update_fields=["email_verified_at"])
         refresh = RefreshToken.for_user(user)
         profile_photo = request.build_absolute_uri(user.profile_photo.url) if user.profile_photo else None
-        response = Response({"access": str(refresh.access_token), "user": {"id": user.pk, "username": user.username, "phone_number": user.phone_number, "first_name": user.first_name, "last_name": user.last_name, "profile_photo": profile_photo}}, status=status.HTTP_200_OK)
+        response = Response({"access": str(refresh.access_token), "user": {"id": user.pk, "username": user.username, "email": user.email, "phone_number": user.phone_number, "first_name": user.first_name, "last_name": user.last_name, "profile_photo": profile_photo}}, status=status.HTTP_200_OK)
         set_refresh_cookie(response, refresh)
         return response
 
@@ -98,6 +111,8 @@ class RefreshView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @method_decorator(csrf_protect)
     def dispatch(self, *args, **kwargs):
         return super().dispatch(*args, **kwargs)
@@ -116,6 +131,7 @@ class LogoutView(APIView):
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
     """Return or update the authenticated user's profile username."""
+    permission_classes = [IsAuthenticated]
     serializer_class = CurrentUserSerializer
 
     def get_object(self):
@@ -123,6 +139,7 @@ class CurrentUserView(generics.RetrieveUpdateAPIView):
 
 
 class AddressViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
     serializer_class = AddressSerializer
 
     def get_queryset(self):

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
-import math
 import logging
+from math import asin, cos, radians, sin, sqrt
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -14,6 +14,7 @@ from carts.models import Cart, CartItem
 from .models import DeliveryServiceArea, Order, OrderItem, OrderItemOption
 
 MONEY = Decimal("0.01")
+EARTH_RADIUS_KM = 6371.0088
 logger = logging.getLogger(__name__)
 
 CANCELLATION_MESSAGES = {
@@ -24,24 +25,40 @@ CANCELLATION_MESSAGES = {
 }
 
 
-def haversine_km(latitude_a, longitude_a, latitude_b, longitude_b):
-    lat1, lat2 = math.radians(float(latitude_a)), math.radians(float(latitude_b))
-    d_lat = lat2 - lat1
-    d_lon = math.radians(float(longitude_b) - float(longitude_a))
-    value = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
-    return 6371.0088 * 2 * math.asin(math.sqrt(min(1, value)))
-
-
-def validate_delivery_location(address):
+def quote_delivery_location(latitude, longitude):
     area = DeliveryServiceArea.objects.filter(pk=1).first()
     if not area or area.latitude is None or area.longitude is None:
         raise ValidationError({"delivery": "Delivery location has not been configured yet. Please try again later."})
-    if address.latitude is None or address.longitude is None:
+    if latitude is None or longitude is None:
         raise ValidationError({"address": "Pin this address on the map to check delivery availability."})
-    distance = haversine_km(area.latitude, area.longitude, address.latitude, address.longitude)
-    if distance > float(area.radius_km):
-        raise ValidationError({"delivery": f"This address is outside our {area.radius_km} km delivery area."})
-    return distance
+    if latitude is None or longitude is None:
+        raise ValidationError({"address": "Pin this address on the map to check delivery availability."})
+    lat1, lon1, lat2, lon2 = map(radians, (float(area.latitude), float(area.longitude), float(latitude), float(longitude)))
+    delta_lat, delta_lon = lat2 - lat1, lon2 - lon1
+    haversine = sin(delta_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(delta_lon / 2) ** 2
+    distance = Decimal(str(2 * EARTH_RADIUS_KM * asin(sqrt(min(1.0, haversine))))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    eligible = distance <= area.max_delivery_distance_km
+    billable_distance = max(Decimal("0.00"), distance - area.free_delivery_km) if eligible else Decimal("0.00")
+    fee = (billable_distance * area.delivery_fee_per_km).quantize(MONEY, rounding=ROUND_HALF_UP) if eligible else None
+    return {
+        "distance_km": distance,
+        "free_delivery_km": area.free_delivery_km,
+        "billable_distance_km": billable_distance,
+        "delivery_fee_per_km": area.delivery_fee_per_km,
+        "delivery_fee": fee,
+        "max_delivery_distance_km": area.max_delivery_distance_km,
+        "market_coordinates": {"latitude": str(area.latitude), "longitude": str(area.longitude)},
+        "delivery_coordinates": {"latitude": str(latitude), "longitude": str(longitude)},
+        "eligible": eligible,
+        "configured": True,
+    }
+
+
+def validate_delivery_location(address):
+    quote = quote_delivery_location(address.latitude, address.longitude)
+    if not quote["eligible"]:
+        raise ValidationError({"delivery": f"This address is {quote['distance_km']} km from the market, outside our {quote['max_delivery_distance_km']} km delivery area."})
+    return quote
 
 
 def _tax_amount(amount, rate):
@@ -49,10 +66,7 @@ def _tax_amount(amount, rate):
 
 
 TRANSITIONS = {
-    Order.Status.PENDING: {Order.Status.CONFIRMED, Order.Status.CANCELLED},
-    Order.Status.CONFIRMED: {Order.Status.PREPARING, Order.Status.CANCELLED},
-    Order.Status.PREPARING: {Order.Status.READY, Order.Status.CANCELLED},
-    Order.Status.READY: {Order.Status.OUT_FOR_DELIVERY, Order.Status.CANCELLED},
+    Order.Status.CONFIRMED: {Order.Status.OUT_FOR_DELIVERY, Order.Status.CANCELLED},
     Order.Status.OUT_FOR_DELIVERY: {Order.Status.COMPLETED, Order.Status.CANCELLED},
     Order.Status.COMPLETED: set(),
     Order.Status.CANCELLED: set(),
@@ -76,9 +90,20 @@ def _address_snapshot(address):
     }
 
 
-@transaction.atomic
 def create_order(*, user, address, fulfillment_type, scheduled_for=None, customer_note=""):
-    validate_delivery_location(address)
+    delivery_quote = validate_delivery_location(address)
+    return _create_order(
+        user=user,
+        address=address,
+        fulfillment_type=fulfillment_type,
+        scheduled_for=scheduled_for,
+        customer_note=customer_note,
+        delivery_quote=delivery_quote,
+    )
+
+
+@transaction.atomic
+def _create_order(*, user, address, fulfillment_type, scheduled_for, customer_note, delivery_quote):
     cart = Cart.objects.select_for_update().filter(user=user).first()
     if cart is None:
         raise ValidationError({"cart": "Your cart is empty."})
@@ -116,6 +141,10 @@ def create_order(*, user, address, fulfillment_type, scheduled_for=None, custome
         status=Order.Status.CONFIRMED,
         customer_note=customer_note,
         stock_reserved=not is_preorder,
+        delivery_distance_km=delivery_quote["distance_km"],
+        delivery_free_distance_km=delivery_quote["free_delivery_km"],
+        delivery_fee_per_km=delivery_quote["delivery_fee_per_km"],
+        delivery_fee=delivery_quote["delivery_fee"],
     )
     try:
         order.full_clean()
@@ -157,9 +186,8 @@ def create_order(*, user, address, fulfillment_type, scheduled_for=None, custome
         gst_total += product_gst_amount + processing_gst_amount
     order.subtotal = subtotal
     order.gst_total = gst_total
-    order.delivery_fee = Decimal("0.00")
     order.total = subtotal + gst_total + order.delivery_fee
-    order.save(update_fields=["subtotal", "gst_total", "delivery_fee", "total", "updated_at"])
+    order.save(update_fields=["subtotal", "gst_total", "total", "updated_at"])
     if not is_preorder:
         for product_id, quantity in quantities.items():
             product = products[product_id]
@@ -176,7 +204,7 @@ def _notify_admin_safely(order_id):
         send_admin_order_notification(order_id)
     except Exception:
         # Notification failures must not turn a committed order into a failed checkout response.
-        logger.exception("Admin order notification failed for order_id=%s", order_id)
+        logger.error("Admin order notification failed for order_id=%s", order_id)
 
 
 @transaction.atomic
