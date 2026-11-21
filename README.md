@@ -80,18 +80,19 @@ Next.js proxies `/api` requests to `http://127.0.0.1:8000` by default. Set `BACK
 
 ## Environment configuration
 
-The repository-root `.env.example` documents the supported local settings. Copy it to `.env` and keep that file private; `.env` and other environment files are excluded from Git. Never place production credentials in `.env.example`.
+Use separate private environment files for each responsibility; all are ignored by Git. Copy each template to the named private file. For example, copy `.env.example` to `.env`, `backend/.env.example` to `backend/.env`, and `frontend/.env.example` to `frontend/.env.local`:
 
-Relevant settings include:
+| File | Copy from | Used for |
+| --- | --- | --- |
+| Project root `.env` | `.env.example` | Docker Compose interpolation: PostgreSQL database/user/password and public storefront values passed at frontend build time. |
+| `backend/.env` | `backend/.env.example` | Django secret key, trusted hosts, OTP settings, SMTP and notification provider credentials. Docker Compose loads this file into the backend only. |
+| `frontend/.env.local` | `frontend/.env.example` | Public `NEXT_PUBLIC_*` settings while running Next.js locally with `npm run dev`. Never put secrets here; these values are compiled into browser code. |
 
-- `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, and `CSRF_TRUSTED_ORIGINS`
-- PostgreSQL connection values for Docker Compose
-- `OTP_PEPPER`, OTP lifetime, and attempt limits
-- `NEXT_PUBLIC_STORE_PHONE` for the About section contact link (currently `9539833135`; the link is formatted for India; after changing it, rebuild the frontend)
-- SMTP settings for email OTP
-- JWT refresh-cookie security and SameSite options
+Django reads `backend/.env` when run locally. Inside Docker, Compose injects `backend/.env` values into the backend container and passes database values from the root `.env` as explicit service environment. Local Django defaults to SQLite; Docker Compose sets `DB_ENGINE=postgres` and `POSTGRES_HOST=db`.
 
-Set `NEXT_PUBLIC_SITE_URL` to the canonical HTTPS website origin before building the frontend so canonical metadata, sitemap, and robots URLs point to the deployed site. Compose requires `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in the private root `.env`; the database container receives only those three settings, not backend SMTP or notification credentials. Production startup rejects placeholder database, Django, and OTP secrets. Also use HTTPS, exact trusted hosts and origins, secure cookies, a production media-storage service, and least-privilege database credentials.
+`NEXT_PUBLIC_STORE_PHONE` is the public contact number (currently `9539833135`; the storefront formats it for India). `NEXT_PUBLIC_SITE_URL` is the canonical site origin, for example `https://thatt.example`, without a path; set it before a production frontend build so canonical metadata, sitemap, and robots URLs are correct. The banner is a static asset at `frontend/public/images/banner.webp`; replace that file to change the banner. The logo is `frontend/public/thatt-logo.webp`.
+
+Compose requires `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in the root `.env`. It passes those to both the backend (to connect) and database container (to initialize Postgres); the backend `.env` remains isolated from the frontend and database service. If a Compose `.env` value contains `$`, escape it as `$$` so Compose passes a literal dollar sign. Production startup rejects placeholder database, Django, and OTP secrets. Also use HTTPS, exact trusted hosts and origins, secure cookies, a production media-storage service, and least-privilege database credentials.
 
 ## Customer authentication and staff access
 
@@ -149,7 +150,7 @@ Common endpoints:
 ## Development notes
 
 - Django migrations are in each backend app's `migrations/` folder. After model changes, create and review migrations, then apply them.
-- The demo-data command is for local development only: `docker compose exec backend python manage.py seed_demo_data`.
+- Add real product images through the staff catalog dashboard. The storefront hero uses the static asset `frontend/public/images/banner.webp`; replace that file with your banner image and rebuild the frontend container. If it is absent, the page displays its gradient fallback. The site logo is `frontend/public/thatt-logo.webp`.
 - Customer access tokens are kept in frontend memory; do not persist them in local storage.
 - The `.gitignore` excludes secrets, virtual environments, local databases/media, caches, and generated frontend output. Commit source, migrations, lockfiles, documentation, and non-sensitive static assets.
 

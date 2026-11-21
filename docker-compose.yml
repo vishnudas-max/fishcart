@@ -1,20 +1,20 @@
+x-postgres-environment: &postgres-environment
+  POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the project-root .env file}
+  POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the project-root .env file}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the project-root .env file}
+
 services:
   backend:
     build: ./backend
     env_file:
       - path: ./backend/.env
-        required: false
-        format: raw
-      - path: ./.env
-        required: false
+        required: true
         format: raw
     environment:
       DB_ENGINE: postgres
       POSTGRES_HOST: db
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the private root .env file}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the private root .env file}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private root .env file}
       POSTGRES_PORT: 5432
+      <<: *postgres-environment
     ports:
       - "8000:8000"
     volumes:
@@ -54,9 +54,7 @@ services:
   db:
     image: postgres:14.24-trixie
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the private root .env file}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the private root .env file}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private root .env file}
+      <<: *postgres-environment
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
